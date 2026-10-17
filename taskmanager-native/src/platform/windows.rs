@@ -261,7 +261,14 @@ impl MemoryExtras {
     }
 
     pub fn fill(&mut self, memory: &mut MemorySample) -> Result<(), String> {
+        // No cheap source for these on Windows (the compression store and paging counters
+        // need PDH, M4; Windows has no pressure level), so they are permanently absent.
         memory.app = Reading::Unsupported;
+        memory.compressed = Reading::Unsupported;
+        memory.page_ins = Reading::Unsupported;
+        memory.page_outs = Reading::Unsupported;
+        memory.pressure_pct = Reading::Unsupported;
+        memory.pressure_level = Reading::Unsupported;
         let size = std::mem::size_of::<PERFORMANCE_INFORMATION>() as u32;
         // SAFETY: PERFORMANCE_INFORMATION is plain data; all-zero is a valid value.
         let mut info: PERFORMANCE_INFORMATION = unsafe { std::mem::zeroed() };

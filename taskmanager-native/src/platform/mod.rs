@@ -198,7 +198,7 @@ impl NativeProvider {
             ..MemorySample::default()
         };
         if let Err(why) = self.memory.fill(&mut memory) {
-            issues.push(format!("memory composition unavailable: {why}"));
+            issues.push(format!("memory: {why}"));
         }
         memory
     }

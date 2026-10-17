@@ -13,7 +13,8 @@
 //! - Kernel CPU split: `/proc/stat` per-CPU system + irq + softirq tick deltas.
 //! - Memory composition: `/proc/meminfo` (cached = `Cached` + `Buffers`, committed =
 //!   `Committed_AS`, compressed = `Zswap` when the kernel reports it) and PSI
-//!   `/proc/pressure/memory` for pressure (`Unsupported` on kernels without PSI).
+//!   `/proc/pressure/memory` for pressure (`Unsupported` on kernels without PSI, or when
+//!   the file is unreadable: noted in health on the first sample only).
 //! - System thread count: `/proc/loadavg`'s scheduling-entity total.
 //! - Applications: the executable (or, when another user's `exe` link is unreadable, the
 //!   process name) is a program some visible `.desktop` launcher runs, from
@@ -203,29 +204,27 @@ impl KernelCpu {
 }
 
 /// Memory composition from `/proc/meminfo` and PSI.
-pub struct MemoryExtras;
+pub struct MemoryExtras {
+    /// Whether an unreadable PSI file has been reported in health already.
+    psi_unreadable_reported: bool,
+}
 
 impl MemoryExtras {
     pub fn new() -> Self {
-        Self
+        Self {
+            psi_unreadable_reported: false,
+        }
     }
 
+    /// Fill cached, committed, compressed and pressure. Wired and app memory have no Linux
+    /// counterpart, and we do not sample page ins/outs here, so those are `Unsupported`.
+    /// Pressure is `Unsupported` without PSI (an old kernel, or a present but unreadable
+    /// file: the latter is reported once, via `Err`, on the first sample that sees it).
     pub fn fill(&mut self, memory: &mut MemorySample) -> Result<(), String> {
         memory.wired = Reading::Unsupported;
         memory.app = Reading::Unsupported;
-        match fs::read_to_string("/proc/pressure/memory") {
-            Ok(text) => {
-                if let Some(psi) = parse_psi(&text) {
-                    memory.pressure_pct = Reading::Value(psi.some_avg10.clamp(0.0, 100.0));
-                    memory.pressure_level = Reading::Value(psi.level());
-                }
-            }
-            Err(e) if e.kind() == std::io::ErrorKind::NotFound => {
-                memory.pressure_pct = Reading::Unsupported;
-                memory.pressure_level = Reading::Unsupported;
-            }
-            Err(_) => {}
-        }
+        memory.page_ins = Reading::Unsupported;
+        memory.page_outs = Reading::Unsupported;
         let text =
             fs::read_to_string("/proc/meminfo").map_err(|e| format!("/proc/meminfo: {e}"))?;
         let info = parse_meminfo(&text);
@@ -236,7 +235,26 @@ impl MemoryExtras {
         };
         memory.committed = field("Committed_AS").into();
         memory.compressed = field("Zswap").into();
-        Ok(())
+
+        match fs::read_to_string("/proc/pressure/memory") {
+            Ok(text) => {
+                if let Some(psi) = parse_psi(&text) {
+                    memory.pressure_pct = Reading::Value(psi.some_avg10.clamp(0.0, 100.0));
+                    memory.pressure_level = Reading::Value(psi.level());
+                }
+                Ok(())
+            }
+            Err(e) => {
+                memory.pressure_pct = Reading::Unsupported;
+                memory.pressure_level = Reading::Unsupported;
+                let first_report = !self.psi_unreadable_reported;
+                if e.kind() == std::io::ErrorKind::NotFound || !first_report {
+                    return Ok(());
+                }
+                self.psi_unreadable_reported = true;
+                Err(format!("memory pressure (PSI) unreadable: {e}"))
+            }
+        }
     }
 }
 
