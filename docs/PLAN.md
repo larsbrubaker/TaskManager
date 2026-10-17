@@ -6,8 +6,14 @@ implementation of the design of TMOG** (Task Manager OG, tmog.org, by Dave Plumm
 reproduce its screens closely by looking at them, and nothing else. We never read,
 decompile or reuse TMOG code, and we ship under our own name, logo and copy.
 
-Status: **planning (2026-10-17).** Nothing built yet. License MIT. Repo
-github.com/larsbrubaker/TaskManager (to be created; rust-apps submodule).
+Status (2026-10-17, paused): **M0 done; M1.1–M1.3 done** (telemetry core, demo platform,
+native platform). **Resume at M1.4**: run the sampler in the app (native worker thread →
+Arc<Snapshot> via ui_thread; wasm steps the demo Sampler), show "providers healthy · N
+processes · Generation G" in the status bar, `--demo` flag, and a shared sensor display-name
+source (MachineInfo sensor list) for both platforms. First Linux/Windows CI run of the native
+code was pending at pause.
+
+License MIT. Repo github.com/larsbrubaker/TaskManager (rust-apps submodule).
 
 The visual targets live in `reference/` (gitignored, see `reference/README.md`): captures
 of TMOG 1.0.x running on Lars's Mac (light theme, real data) are the primary reference;
