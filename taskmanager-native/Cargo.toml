@@ -23,3 +23,21 @@ path = "src/main.rs"
 taskmanager-core = { path = "../taskmanager-core" }
 agg-gui = { workspace = true }
 agg-gui-shell = { workspace = true }
+# The cross-platform telemetry base (PLAN §4.3), with only the subsystems we sample.
+sysinfo = { version = "0.39", default-features = false, features = ["system", "disk", "network", "component", "user"] }
+# Open URLs in the user's browser (as HDTreeMap does).
+opener = "0.9"
+
+# Per-OS extras sysinfo lacks: start stamps, kernel CPU split, memory composition, signals.
+[target.'cfg(unix)'.dependencies]
+libc = "0.2"
+
+[target.'cfg(windows)'.dependencies]
+windows-sys = { version = "0.61", features = [
+    "Win32_Foundation",
+    "Win32_System_Diagnostics_ToolHelp",
+    "Win32_System_ProcessStatus",
+    "Win32_System_SystemInformation",
+    "Win32_System_Threading",
+    "Win32_UI_WindowsAndMessaging",
+] }

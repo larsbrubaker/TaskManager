@@ -5,8 +5,11 @@
 //! the window (default 1242 x 791, the reference window; minimum 1100 x 700, PLAN §2), reads
 //! the start-up page and theme ([`startup`]), keeps the window's title bar and the OS
 //! appearance in step with the theme ([`theme`]) and hands the window the app built by
-//! `taskmanager-core`. The real OS telemetry provider, command line and remembered window
-//! bounds arrive with later milestones.
+//! `taskmanager-core`. The native platform (real OS telemetry, [`platform`]) is built but not
+//! yet wired to the window (M1.4); remembered window bounds arrive later.
+//!
+//! Command line ([`cli`]): `--dump-snapshot [N]` samples the machine headless and prints a
+//! summary ([`dump`]); `--help` lists the options.
 //!
 //! `TASKMANAGER_PAGE=<id>` opens a page and `TASKMANAGER_THEME=light|dark|system` picks the
 //! look ([`startup`]). `TASKMANAGER_SCREENSHOT=out.png` captures one frame after start-up
@@ -14,6 +17,9 @@
 //! `TASKMANAGER_THEME` says otherwise); `TASKMANAGER_SCREENSHOT_FRAMES=N` sets how many
 //! frames to let settle first (default 10).
 
+mod cli;
+mod dump;
+mod platform;
 mod startup;
 mod theme;
 
@@ -35,6 +41,22 @@ const MIN_SIZE: (f64, f64) = (1100.0, 700.0);
 const DEFAULT_SCREENSHOT_FRAMES: u32 = 10;
 
 fn main() -> ExitCode {
+    let args: Vec<String> = std::env::args().skip(1).collect();
+    match cli::parse(&args) {
+        Ok(cli::Command::App) => {}
+        Ok(cli::Command::DumpSnapshot { samples }) => {
+            dump::run(samples);
+            return ExitCode::SUCCESS;
+        }
+        Ok(cli::Command::Help) => {
+            println!("{}", cli::USAGE);
+            return ExitCode::SUCCESS;
+        }
+        Err(message) => {
+            eprintln!("taskmanager: {message}\n\n{}", cli::USAGE);
+            return ExitCode::from(2);
+        }
+    }
     let startup = match Startup::from_env() {
         Ok(startup) => startup,
         Err(message) => {
