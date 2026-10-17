@@ -8,8 +8,14 @@
 //!   carry-forward when a listing fails.
 //! - [`tree`] — the parent/child forest the Processes page expands, and the per-table
 //!   lookup index.
+//! - [`kind`] — pure Application / Background heuristics over OS facts.
+//! - [`proc_stat`] — parser for Linux `/proc/<pid>/stat` (the start-time stamp).
+//! - [`desktop`] — parser for freedesktop `.desktop` entries (Linux app detection).
 
+pub mod desktop;
 pub mod key;
+pub mod kind;
+pub mod proc_stat;
 pub mod table;
 pub mod tree;
 
