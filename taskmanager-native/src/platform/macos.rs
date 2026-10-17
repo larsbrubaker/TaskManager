@@ -20,7 +20,8 @@
 //!   kinds from `networksetup -listallhardwareports` (run once per `machine_info`).
 //!
 //! Every `unsafe` block is an FFI call into libc / the Mach kernel interface and says why
-//! it is sound.
+//! it is sound. Mach port rights we are handed (host port, default processor set) are
+//! owned by `PortRight` and released when the sampler drops.
 
 use std::ffi::{c_int, c_void, CString};
 use std::mem::{size_of, MaybeUninit};
@@ -44,13 +45,35 @@ pub const CACHE_IDENTITY: bool = true;
 /// (other users' processes without root), so an all-zero row means "not readable".
 pub const ZERO_USAGE_MEANS_DENIED: bool = true;
 
-// Mach calls libc declares but deprecates in favour of the `mach2` crate; they are stable
-// kernel ABI and the only uses here, so we keep to libc rather than add a dependency.
-#[allow(deprecated)]
-fn host_port() -> libc::mach_port_t {
-    // SAFETY: `mach_host_self` takes no arguments and returns a send right to the host
-    // port (or MACH_PORT_NULL). Callers keep the right for their lifetime.
-    unsafe { libc::mach_host_self() }
+/// A send right to a Mach port we own, released on drop with `mach_port_deallocate`
+/// (`mach_host_self` and `processor_set_default` each hand us a new reference).
+struct PortRight(libc::mach_port_t);
+
+impl PortRight {
+    /// The host port. `mach_host_self` is declared by libc but deprecated in favour of the
+    /// `mach2` crate; it is stable kernel ABI and our only use, so we keep to libc.
+    #[allow(deprecated)]
+    fn host() -> Self {
+        // SAFETY: `mach_host_self` takes no arguments and returns a new send right to the
+        // host port (or MACH_PORT_NULL), which this value now owns.
+        Self(unsafe { libc::mach_host_self() })
+    }
+
+    fn port(&self) -> libc::mach_port_t {
+        self.0
+    }
+}
+
+impl Drop for PortRight {
+    fn drop(&mut self) {
+        if self.0 != 0 {
+            // SAFETY: releases the one user reference this value owns, exactly once; the
+            // port name is not used afterwards.
+            unsafe {
+                mach_port_deallocate(task_port(), self.0);
+            }
+        }
+    }
 }
 
 #[allow(deprecated)]
@@ -60,7 +83,11 @@ fn task_port() -> libc::mach_port_t {
 }
 
 extern "C" {
-    // <mach/mach_host.h> / <mach/processor_set.h>; not in libc.
+    // <mach/mach_host.h> / <mach/processor_set.h> / <mach/mach_port.h>; not in libc.
+    fn mach_port_deallocate(
+        task: libc::mach_port_t,
+        name: libc::mach_port_t,
+    ) -> libc::kern_return_t;
     fn processor_set_default(
         host: libc::mach_port_t,
         default_set: *mut libc::mach_port_t,
@@ -101,11 +128,16 @@ fn bsd_info_identity(pid: c_int) -> Result<Identity, StampError> {
             size,
         )
     };
-    if written != size {
+    if written > 0 && written != size {
+        // A short write is not a failed call: errno was not set and must not be read.
+        return Err(StampError::Failed(format!(
+            "proc_pidinfo returned {written} of {size} bytes"
+        )));
+    }
+    if written <= 0 {
         return Err(match unix::errno() {
             libc::ESRCH => StampError::NotFound,
             libc::EPERM | libc::EACCES => StampError::Denied,
-            0 => StampError::Failed("proc_pidinfo returned a short record".into()),
             e => StampError::Failed(std::io::Error::from_raw_os_error(e).to_string()),
         });
     }
@@ -188,6 +220,10 @@ pub fn end_verified(key: ProcessKey, force: bool) -> Result<(), ActionError> {
     if current.stamp != key.start_time {
         return Err(ActionError::IdentityChanged);
     }
+    // macOS has no pidfd: between this check and `kill` the process could exit and its pid
+    // be reused. The window is a few microseconds and pids are handed out sequentially
+    // (wrapping at 99999), so a reuse inside it would need ~100k process launches in that
+    // time; we accept this unavoidable gap.
     unix::signal(key.pid.0, force)
 }
 
@@ -204,21 +240,21 @@ pub fn is_system_mount(mount: &std::path::Path) -> bool {
 
 /// Per-CPU kernel share from `host_processor_info` tick deltas.
 pub struct KernelCpu {
-    host: libc::mach_port_t,
+    host: PortRight,
     previous: Option<Vec<[u32; 4]>>,
 }
 
 impl KernelCpu {
     pub fn new() -> Self {
         Self {
-            host: host_port(),
+            host: PortRight::host(),
             previous: None,
         }
     }
 
     /// The kernel share since the previous call (`Ok(None)` on the first).
     pub fn sample(&mut self) -> Result<Option<KernelSplit>, String> {
-        let ticks = cpu_ticks(self.host)?;
+        let ticks = cpu_ticks(self.host.port())?;
         let split = self
             .previous
             .as_ref()
@@ -295,7 +331,7 @@ fn cpu_ticks(host: libc::mach_port_t) -> Result<Vec<[u32; 4]>, String> {
 
 /// Memory composition from the VM statistics and memory-status sysctls.
 pub struct MemoryExtras {
-    host: libc::mach_port_t,
+    host: PortRight,
     page_size: Option<u64>,
     previous_pages: Option<(u64, u64)>,
 }
@@ -303,7 +339,7 @@ pub struct MemoryExtras {
 impl MemoryExtras {
     pub fn new() -> Self {
         Self {
-            host: host_port(),
+            host: PortRight::host(),
             page_size: sysctl_u64("hw.pagesize"),
             previous_pages: None,
         }
@@ -326,7 +362,7 @@ impl MemoryExtras {
             memory.pressure_pct = Reading::Value((100 - free_pct) as f32);
         }
         let page = self.page_size.ok_or("hw.pagesize unreadable")?;
-        let stats = vm_statistics(self.host)?;
+        let stats = vm_statistics(self.host.port())?;
         let pages = |count: u32| Reading::Value(u64::from(count) * page);
         memory.wired = pages(stats.wire_count);
         memory.compressed = pages(stats.compressor_page_count);
@@ -370,22 +406,27 @@ fn vm_statistics(host: libc::mach_port_t) -> Result<libc::vm_statistics64, Strin
 
 /// Thread totals: system-wide from the default processor set; no per-process counts.
 pub struct Threads {
-    pset: Option<libc::mach_port_t>,
+    pset: Option<PortRight>,
 }
 
 impl Threads {
     pub fn new() -> Self {
+        let host = PortRight::host();
         let mut pset: libc::mach_port_t = 0;
         // SAFETY: `pset` is a valid out-pointer; on success it receives a send right to the
         // default processor set's name port, which we keep for our lifetime.
-        let kr = unsafe { processor_set_default(host_port(), &mut pset) };
+        let kr = unsafe { processor_set_default(host.port(), &mut pset) };
         Self {
-            pset: (kr == libc::KERN_SUCCESS).then_some(pset),
+            pset: (kr == libc::KERN_SUCCESS).then_some(PortRight(pset)),
         }
     }
 
     pub fn sample(&mut self) -> Result<ThreadInfo, String> {
-        let pset = self.pset.ok_or("processor_set_default failed")?;
+        let pset = self
+            .pset
+            .as_ref()
+            .ok_or("processor_set_default failed")?
+            .port();
         let mut info = MaybeUninit::<libc::processor_set_load_info>::zeroed();
         let mut count = (size_of::<libc::processor_set_load_info>() / size_of::<libc::natural_t>())
             as libc::mach_msg_type_number_t;
@@ -623,6 +664,20 @@ mod tests {
         );
         assert_eq!(kinfo_identity(i32::MAX), Err(StampError::NotFound));
         assert_eq!(parse_kinfo_proc(&[0u8; 16]), None);
+    }
+
+    #[test]
+    fn samplers_can_be_made_and_dropped_repeatedly() {
+        // Each round takes and releases host / processor-set rights.
+        for _ in 0..50 {
+            let mut kernel = KernelCpu::new();
+            assert!(kernel.sample().is_ok());
+            let mut memory = MemoryExtras::new();
+            let mut sample = MemorySample::default();
+            assert!(memory.fill(&mut sample).is_ok());
+            assert!(sample.wired.is_value());
+            assert!(Threads::new().sample().is_ok_and(|t| t.total.is_value()));
+        }
     }
 
     #[test]
