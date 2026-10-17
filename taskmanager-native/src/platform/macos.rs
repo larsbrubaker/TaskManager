@@ -37,6 +37,9 @@ use super::rates::delta_between;
 use super::unix;
 pub use super::unix::{process_cpu_time, sysinfo_uid};
 
+/// Whether identity reads are cached per (pid, start second) across ticks: `proc_pidinfo` / `kinfo_proc` reads are per-process syscalls worth caching.
+pub const CACHE_IDENTITY: bool = true;
+
 /// On macOS, sysinfo reports zero memory and CPU time for processes it may not inspect
 /// (other users' processes without root), so an all-zero row means "not readable".
 pub const ZERO_USAGE_MEANS_DENIED: bool = true;

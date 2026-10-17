@@ -12,11 +12,19 @@
 //! and Linux (`/proc`) the stamp is readable for every process, so fallbacks are a
 //! Windows matter.
 //!
+//! Identity reads are cached per (pid, sysinfo start seconds) on macOS and Windows
+//! ([`IdentityCache`], `os::CACHE_IDENTITY`), so only processes new this tick cost a
+//! syscall. A pid recycled within the same second would match the cached pair; the cache
+//! also drops an entry whose CPU time went backwards (a new process starts near zero), and
+//! actions never use cached stamps (`end_process` re-reads), so the residual risk is a
+//! table row briefly keeping the old key, never an action on the wrong process. Linux
+//! reads `/proc/<pid>/stat` every tick anyway (it also yields the thread count).
+//!
 //! Rates (CPU share, disk bytes per second) come from cumulative counters keyed by
 //! `ProcessKey`, so a process seen for the first time, or a recycled pid, reports
 //! `Unavailable` rather than a bogus first delta.
 
-use std::collections::HashSet;
+use std::collections::{HashMap, HashSet};
 use std::time::Duration;
 
 use sysinfo::{
@@ -26,7 +34,7 @@ use taskmanager_core::process::{Pid, ProcessKind, ProcessRow, ProcessStatus};
 use taskmanager_core::{ProcessKey, ProcessTable, Reading};
 
 use super::os;
-use super::os_api::{StampError, ThreadInfo};
+use super::os_api::{Identity, StampError, ThreadInfo};
 use super::rates::{per_second, CounterTracker};
 
 /// A process key's start stamp when the OS stamp is unreadable: sysinfo's start time
@@ -78,7 +86,66 @@ pub struct ProcessListing {
 }
 
 /// Process sampling state: previous counters per key, the Applications classifier.
+/// A remembered identity read: the identity (`None`: the OS refused it) and the process's
+/// CPU time when it was read.
+#[derive(Clone, Copy, Debug)]
+struct CachedIdentity {
+    identity: Option<Identity>,
+    cpu_ms: u64,
+}
+
+/// Identity reads remembered per (pid, sysinfo start seconds) across ticks.
+#[derive(Debug, Default)]
+pub struct IdentityCache {
+    enabled: bool,
+    previous: HashMap<(u32, u64), CachedIdentity>,
+    current: HashMap<(u32, u64), CachedIdentity>,
+}
+
+impl IdentityCache {
+    pub fn new(enabled: bool) -> Self {
+        Self {
+            enabled,
+            ..Self::default()
+        }
+    }
+
+    /// Start a tick: entries not looked up this tick are forgotten at the next one.
+    pub fn begin_tick(&mut self) {
+        self.previous = std::mem::take(&mut self.current);
+    }
+
+    /// The identity of `pid` (started at `start_secs`, with `cpu_ms` of CPU time so far):
+    /// remembered from the previous tick when the pair matches and the CPU time did not go
+    /// backwards, otherwise read with `read`.
+    pub fn lookup(
+        &mut self,
+        pid: u32,
+        start_secs: u64,
+        cpu_ms: u64,
+        read: impl FnOnce(u32) -> Result<Identity, StampError>,
+    ) -> Result<Identity, StampError> {
+        if !self.enabled {
+            return read(pid);
+        }
+        let pair = (pid, start_secs);
+        let remembered = self.previous.get(&pair).filter(|c| cpu_ms >= c.cpu_ms);
+        let identity = match remembered {
+            Some(cached) => cached.identity,
+            None => match read(pid) {
+                Ok(identity) => Some(identity),
+                Err(StampError::NotFound) => return Err(StampError::NotFound),
+                Err(StampError::Denied | StampError::Failed(_)) => None,
+            },
+        };
+        self.current
+            .insert(pair, CachedIdentity { identity, cpu_ms });
+        identity.ok_or(StampError::Denied)
+    }
+}
+
 pub struct ProcessSampler {
+    identities: IdentityCache,
     cpu_ms: CounterTracker<ProcessKey>,
     disk_read: CounterTracker<ProcessKey>,
     disk_written: CounterTracker<ProcessKey>,
@@ -88,6 +155,7 @@ pub struct ProcessSampler {
 impl ProcessSampler {
     pub fn new() -> Self {
         Self {
+            identities: IdentityCache::new(os::CACHE_IDENTITY),
             cpu_ms: CounterTracker::default(),
             disk_read: CounterTracker::default(),
             disk_written: CounterTracker::default(),
@@ -121,6 +189,7 @@ impl ProcessSampler {
         if let Err(why) = self.classifier.begin_tick() {
             issues.push(format!("application detection unavailable: {why}"));
         }
+        self.identities.begin_tick();
         self.cpu_ms.begin_tick();
         self.disk_read.begin_tick();
         self.disk_written.begin_tick();
@@ -136,7 +205,13 @@ impl ProcessSampler {
                 continue;
             }
             let pid = pid.as_u32();
-            let (key, stamp_threads, stamp_uid) = match os::read_identity(pid) {
+            let identity = self.identities.lookup(
+                pid,
+                process.start_time(),
+                process.accumulated_cpu_time(),
+                os::read_identity,
+            );
+            let (key, stamp_threads, stamp_uid) = match identity {
                 Ok(identity) => (
                     ProcessKey::new(pid, identity.stamp),
                     identity.threads,
@@ -267,6 +342,76 @@ mod tests {
         assert_eq!(
             cpu_share(Reading::Value(1_000), second, 0),
             Reading::Value(100.0)
+        );
+    }
+
+    fn id(stamp: u64) -> Identity {
+        Identity {
+            stamp,
+            threads: None,
+            uid: None,
+        }
+    }
+
+    #[test]
+    fn identities_are_read_once_per_pid_and_start_second() {
+        let reads = std::cell::Cell::new(0);
+        let read = |stamp: u64| {
+            let reads = &reads;
+            move |_pid: u32| {
+                reads.set(reads.get() + 1);
+                Ok(id(stamp))
+            }
+        };
+        let mut cache = IdentityCache::new(true);
+        cache.begin_tick();
+        assert_eq!(cache.lookup(7, 100, 5, read(1)), Ok(id(1)));
+        cache.begin_tick();
+        assert_eq!(cache.lookup(7, 100, 9, read(2)), Ok(id(1)), "remembered");
+        assert_eq!(reads.get(), 1);
+        cache.begin_tick();
+        // CPU time went backwards: a different process holds the pid now.
+        assert_eq!(cache.lookup(7, 100, 3, read(3)), Ok(id(3)));
+        cache.begin_tick();
+        // Another start second is another process.
+        assert_eq!(cache.lookup(7, 101, 3, read(4)), Ok(id(4)));
+        cache.begin_tick();
+        cache.begin_tick();
+        assert_eq!(
+            cache.lookup(7, 101, 3, read(5)),
+            Ok(id(5)),
+            "absent a tick: forgotten"
+        );
+        assert_eq!(reads.get(), 4);
+    }
+
+    #[test]
+    fn refusals_are_remembered_and_gone_processes_are_not() {
+        let mut cache = IdentityCache::new(true);
+        cache.begin_tick();
+        assert_eq!(
+            cache.lookup(9, 1, 0, |_| Err(StampError::Denied)),
+            Err(StampError::Denied)
+        );
+        cache.begin_tick();
+        assert_eq!(
+            cache.lookup(9, 1, 0, |_| Ok(id(5))),
+            Err(StampError::Denied)
+        );
+        assert_eq!(
+            cache.lookup(8, 1, 0, |_| Err(StampError::NotFound)),
+            Err(StampError::NotFound)
+        );
+        cache.begin_tick();
+        assert_eq!(cache.lookup(8, 1, 0, |_| Ok(id(6))), Ok(id(6)));
+        let mut off = IdentityCache::new(false);
+        off.begin_tick();
+        off.lookup(1, 1, 1, |_| Ok(id(1))).ok();
+        off.begin_tick();
+        assert_eq!(
+            off.lookup(1, 1, 1, |_| Ok(id(2))),
+            Ok(id(2)),
+            "disabled: always read"
         );
     }
 

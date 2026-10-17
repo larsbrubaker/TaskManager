@@ -52,6 +52,9 @@ use windows_sys::Win32::UI::WindowsAndMessaging::{
 
 use super::os_api::{Identity, KernelSplit, StampError, ThreadInfo};
 
+/// Whether identity reads are cached per (pid, start second) across ticks: `OpenProcess` + `GetProcessTimes` per process are worth caching.
+pub const CACHE_IDENTITY: bool = true;
+
 /// sysinfo reports zero memory and CPU time for processes it cannot open (protected
 /// processes), so an all-zero row means "not readable".
 pub const ZERO_USAGE_MEANS_DENIED: bool = true;

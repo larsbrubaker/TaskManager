@@ -5,6 +5,8 @@
 //!
 //! - `ZERO_USAGE_MEANS_DENIED: bool` — whether sysinfo's all-zero memory and CPU time for
 //!   a process means "not allowed to read" rather than a measured zero;
+//! - `CACHE_IDENTITY: bool` — whether `processes::IdentityCache` may reuse identity reads
+//!   across ticks;
 //! - `read_identity(pid) -> Result<Identity, StampError>` — the fine-grained start stamp
 //!   (PLAN §4.4) and, where the same read gives it, the thread count;
 //! - `end_verified(key, force)` — re-read the stamp, refuse on mismatch, then end the

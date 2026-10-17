@@ -45,6 +45,9 @@ use super::os_api::{Identity, KernelSplit, StampError, ThreadInfo};
 use super::unix;
 pub use super::unix::{process_cpu_time, sysinfo_uid};
 
+/// Whether identity reads are cached per (pid, start second) across ticks: `/proc/<pid>/stat` is read every tick anyway: it also gives the thread count.
+pub const CACHE_IDENTITY: bool = false;
+
 /// `/proc` is readable for every process, so sysinfo's zeros are measured zeros (kernel
 /// threads really have no user memory).
 pub const ZERO_USAGE_MEANS_DENIED: bool = false;
