@@ -5,7 +5,8 @@
 //! The UI face is agg-gui's bundled Noto Sans with its standard fallback chain, which puts
 //! Font Awesome 4.7 behind it: an icon is just its code point drawn as ordinary text. The
 //! code points the app uses are named in [`fa`]. The look installed here is agg-gui's Light
-//! visuals; the Light / Dark / Match System setting (`theme.rs`) replaces it when it lands.
+//! visuals, a neutral starting point: `build_app` then installs the look the user's Light /
+//! Dark / Match System choice resolves to (`theme.rs`, `state/theme.rs`).
 
 use std::sync::Arc;
 
@@ -16,6 +17,21 @@ use agg_gui::{font_settings, set_device_scale};
 
 /// Point size of a page title ("Summary", "Performance", …) in the title row.
 pub const TITLE_FONT_SIZE: f64 = 32.0;
+
+/// Point size of a sidebar row's label (and the footer's Settings label).
+pub const SIDEBAR_FONT_SIZE: f64 = 14.0;
+
+/// Point size of a sidebar row's icon.
+pub const SIDEBAR_ICON_SIZE: f64 = 14.0;
+
+/// Point size of the sidebar's small-caps group divider ("MORE").
+pub const DIVIDER_FONT_SIZE: f64 = 10.5;
+
+/// Point size of the status bar's text.
+pub const STATUS_FONT_SIZE: f64 = 13.0;
+
+/// Point size of the word in the sidebar logo.
+pub const LOGO_FONT_SIZE: f64 = 21.0;
 
 /// Font Awesome 4.7 code points used by the app (checked against the bundled face in the
 /// tests below).
@@ -56,9 +72,15 @@ pub mod fa {
     pub const PAINT_BRUSH: char = '\u{f1fc}';
     /// fa-columns — show / hide the sidebar.
     pub const COLUMNS: char = '\u{f0db}';
+    /// fa-sun-o — switch to the light theme.
+    pub const SUN_O: char = '\u{f185}';
+    /// fa-moon-o — switch to the dark theme.
+    pub const MOON_O: char = '\u{f186}';
+    /// fa-circle — the status bar's status dot.
+    pub const CIRCLE: char = '\u{f111}';
 
     /// Every code point above, for the coverage test.
-    pub const ALL: [char; 18] = [
+    pub const ALL: [char; 21] = [
         TACHOMETER,
         HEARTBEAT,
         LIST_ALT,
@@ -77,6 +99,9 @@ pub mod fa {
         COG,
         PAINT_BRUSH,
         COLUMNS,
+        SUN_O,
+        MOON_O,
+        CIRCLE,
     ];
 }
 

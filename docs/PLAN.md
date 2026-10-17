@@ -67,19 +67,20 @@ Reference: every `reference/app/*.png`.
 └────────────┴──────────────────────────────────────────────────────────────┘
 ```
 
-- **Sidebar** (~190 pt wide, agg-gui's panel colour for the current theme): one
-  row per destination, Font Awesome icon + label (~17 pt), rounded selection pill in the theme's selection colour. TMOG splits the list with a small "PRO" divider; ours keeps the
+- **Sidebar** (~240 pt wide, agg-gui's panel colour for the current theme): one
+  row per destination on a ~36.5 pt pitch, Font Awesome icon + label (~14 pt in Noto Sans; the
+  reference's cap height is ~10 pt), rounded ~34 pt selection pill in the theme's selection colour. TMOG splits the list with a small "PRO" divider; ours keeps the
   divider as a plain group separator labelled **MORE** (we have no Pro).
   The logo sits near the bottom; below it, a footer row with **Settings** and
   a **theme** button (sun/moon) that switches agg-gui Light / Dark. TMOG's Colors
   popover is not reproduced.
-- **Title bar row**: sidebar toggle icon, then the page title, large, in agg-gui's default font. Page actions on the right: a filter field ("Filter by name, user, or PID"),
+- **Title bar row** (~53 pt tall, a separator line under it): sidebar toggle icon, then the page title, large, in agg-gui's default font. Page actions on the right: a filter field ("Filter by name, user, or PID"),
   a view combo ("Process View"), Reload, Export…, Reset, Start, depending on page.
 - **Notice banner**: pale blue strip with an info icon, message, and optional
   Yes / No / ✕ — used for one-time questions (e.g. "Open TaskManager with
   Control-Shift-Escape?" on Windows/macOS/Linux where we can register it). Built on an
   agg-gui banner widget (add one to agg-gui if missing).
-- **Status bar**: green dot + "Native providers healthy" (or which provider is degraded),
+- **Status bar** (~36 pt tall, level with the sidebar footer): green dot + "Native providers healthy" (or which provider is degraded),
   process count, primary IP, sample **Generation N** (monotonic sample counter), and on
   the right the Flight Recorder transport: record (red LED), stop, live indicator and a
   VFD time readout `00:00:00.00` while recording or replaying.
@@ -349,7 +350,7 @@ saturation, bloom, HDR) is out of scope.
 ```
 taskmanager-core/     rlib, everything testable, no platform code
   src/fonts.rs          font sizes + Font Awesome code points (fa::*)
-  src/theme.rs          Theme {Light, Dark, System}, agg-gui Visuals, ChannelPalette
+  src/theme.rs          ThemeChoice {System, Light, Dark}, agg-gui Visuals, ChannelPalette
   src/format.rs         bytes, rates, %, °C/°F, durations; sizes one decimal ("2.2 GB"),
                         rates three significant figures with "/sec" ("35.8 KB/sec")
   src/reading.rs        Reading<T>
@@ -360,7 +361,8 @@ taskmanager-core/     rlib, everything testable, no platform code
   src/platform/parse/   pure parsers (proc, meminfo, launchctl, netstat tables, …)
   src/recorder/         .tmtrace writer/reader, replay clock
   src/settings.rs       persisted settings (JSON) + SettingsStore trait
-  src/state/            AppState: current page, selection, sampler pump, notices
+  src/state/            AppState: current page, theme state (choice, OS appearance,
+                        installed look), selection, sampler pump, notices
   src/ui/               mod.rs root (sidebar + page host + status bar), chrome/,
                         instruments/ (§3), pages/<one module per screen>
   tests/                headless UI tests per page, file_line_count, parsers

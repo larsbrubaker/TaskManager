@@ -1,38 +1,55 @@
 //! Headless test of the app's root widget: the production tree from `build_app`, laid out
 //! and painted into a software framebuffer at the default window size with no window and
-//! no GPU, as a shell would drive it.
+//! no GPU, as a shell would drive it. The chrome's parts sit where PLAN §2 puts them.
 
-use agg_gui::widget::{find_widget_by_id, find_widget_screen_rect};
-use agg_gui::{Framebuffer, GfxCtx, Label, Size};
-use taskmanager_core::ui::TITLE_ID;
-use taskmanager_core::{build_app, install_theme_and_fonts, APP_TITLE};
+mod common;
 
-const WIDTH: f64 = 1242.0;
-const HEIGHT: f64 = 791.0;
+use common::{Harness, HEIGHT, WIDTH};
+use taskmanager_core::ui::chrome::{
+    page_content_id, BAR_HEIGHT, LOGO_ID, PAGE_TITLE_ID, SIDEBAR_ID, SIDEBAR_WIDTH, STATUS_TEXT_ID,
+    TITLE_ROW_HEIGHT,
+};
 
 #[test]
-fn root_shows_the_product_title_in_the_top_left() {
-    let fonts = install_theme_and_fonts(1.0).expect("bundled fonts load");
-    let mut app = build_app(&fonts);
-    let size = Size::new(WIDTH, HEIGHT);
-    app.layout(size);
-    let mut fb = Framebuffer::new(WIDTH as u32, HEIGHT as u32);
-    let mut ctx = GfxCtx::new(&mut fb);
-    app.paint(&mut ctx);
+fn chrome_frames_the_page_like_the_reference_window() {
+    let h = Harness::new();
 
-    let text = find_widget_by_id(app.root(), TITLE_ID)
-        .and_then(|w| w.as_any())
-        .and_then(|a| a.downcast_ref::<Label>())
-        .map(|l| l.text_str().to_string())
-        .expect("the title label exists");
-    assert_eq!(text, APP_TITLE);
+    // Y-up screen rects. The sidebar runs down the whole left edge.
+    let sidebar = h.rect(SIDEBAR_ID);
+    assert_eq!(sidebar.x, 0.0, "{sidebar:?}");
+    assert!((sidebar.width - SIDEBAR_WIDTH).abs() < 0.5, "{sidebar:?}");
+    assert!((sidebar.height - HEIGHT).abs() < 0.5, "{sidebar:?}");
 
-    // Y-up screen rect: the title sits in the top-left quarter of the window.
-    let rect = find_widget_screen_rect(app.root(), TITLE_ID).expect("the title is visible");
+    // The page title sits top-left of the content area.
+    assert_eq!(h.label_text(PAGE_TITLE_ID), "Summary");
+    let title = h.rect(PAGE_TITLE_ID);
     assert!(
-        rect.width > 0.0 && rect.height > 0.0,
-        "title has a size: {rect:?}"
+        title.x > SIDEBAR_WIDTH && title.x < SIDEBAR_WIDTH + 80.0,
+        "{title:?}"
     );
-    assert!(rect.x < WIDTH / 4.0, "title is at the left: {rect:?}");
-    assert!(rect.y > HEIGHT * 0.75, "title is at the top: {rect:?}");
+    assert!(
+        title.y > HEIGHT - TITLE_ROW_HEIGHT,
+        "title in the title row: {title:?}"
+    );
+
+    // The status line sits in the bottom bar, the logo above the sidebar footer.
+    let status = h.rect(STATUS_TEXT_ID);
+    assert!(
+        status.x > SIDEBAR_WIDTH && status.y < BAR_HEIGHT,
+        "{status:?}"
+    );
+    let logo = h.rect(LOGO_ID);
+    assert!(logo.y > BAR_HEIGHT && logo.y < HEIGHT / 3.0, "{logo:?}");
+
+    // The page host fills the rest of the content area.
+    let page = h.rect(&page_content_id("summary"));
+    assert!((page.x - SIDEBAR_WIDTH).abs() < 0.5, "{page:?}");
+    assert!(
+        (page.width - (WIDTH - SIDEBAR_WIDTH)).abs() < 0.5,
+        "{page:?}"
+    );
+    assert!(
+        page.height > HEIGHT - TITLE_ROW_HEIGHT - BAR_HEIGHT - 4.0,
+        "{page:?}"
+    );
 }
