@@ -28,7 +28,7 @@ use std::collections::{HashMap, HashSet};
 use std::time::Duration;
 
 use sysinfo::{
-    Process, ProcessRefreshKind, ProcessesToUpdate, System, ThreadKind, UpdateKind, Users,
+    Process, ProcessRefreshKind, ProcessesToUpdate, System, ThreadKind, Uid, UpdateKind, Users,
 };
 use taskmanager_core::process::{Pid, ProcessKind, ProcessRow, ProcessStatus};
 use taskmanager_core::{ProcessKey, ProcessTable, Reading};
@@ -146,6 +146,7 @@ impl IdentityCache {
 
 pub struct ProcessSampler {
     identities: IdentityCache,
+    names: NameLookup<Uid>,
     cpu_ms: CounterTracker<ProcessKey>,
     disk_read: CounterTracker<ProcessKey>,
     disk_written: CounterTracker<ProcessKey>,
@@ -156,6 +157,7 @@ impl ProcessSampler {
     pub fn new() -> Self {
         Self {
             identities: IdentityCache::new(os::CACHE_IDENTITY),
+            names: NameLookup::default(),
             cpu_ms: CounterTracker::default(),
             disk_read: CounterTracker::default(),
             disk_written: CounterTracker::default(),
@@ -196,7 +198,7 @@ impl ProcessSampler {
 
         let logical_cpus = sys.cpus().len();
         let per_pid_threads = threads.and_then(|t| t.per_pid.as_ref());
-        let mut users_refreshed = false;
+        self.names.begin_tick();
         let mut fallback_keys = HashSet::new();
         let mut thread_sum = Some(0u64);
         let mut rows = Vec::with_capacity(sys.processes().len());
@@ -232,7 +234,7 @@ impl ProcessSampler {
             let mut row = ProcessRow::new(key, process.name().to_string_lossy());
             row.parent = process.parent().map(|p| Pid(p.as_u32()));
             row.exe = process.exe().map(|p| p.to_string_lossy().into_owned());
-            row.user = user_name(process, stamp_uid, users, &mut users_refreshed);
+            row.user = user_name(process, stamp_uid, users, &mut self.names);
             row.status = status(process.status());
             row.threads = threads.into();
             row.kind = if self
@@ -293,13 +295,12 @@ impl ProcessSampler {
 }
 
 /// The owner's user name: sysinfo's uid for the process, else the uid the identity read
-/// found (macOS root processes sysinfo may not inspect). The user list is refreshed at
-/// most once per tick, when a uid is new.
+/// found (macOS root processes sysinfo may not inspect).
 fn user_name(
     process: &Process,
     identity_uid: Option<u32>,
     users: &mut Users,
-    refreshed: &mut bool,
+    names: &mut NameLookup<Uid>,
 ) -> Reading<String> {
     let uid = match process.user_id() {
         Some(uid) => uid.clone(),
@@ -308,14 +309,61 @@ fn user_name(
             None => return Reading::Unavailable,
         },
     };
-    if users.get_user_by_id(&uid).is_none() && !*refreshed {
-        users.refresh();
-        *refreshed = true;
+    let mut lookup_users = |uid: &Uid, refresh: bool| {
+        if refresh {
+            users.refresh();
+        }
+        users.get_user_by_id(uid).map(|u| u.name().to_string())
+    };
+    names.resolve(uid, &mut lookup_users).into()
+}
+
+/// When to re-read the user list: at most once per tick, and only for a uid we have not
+/// already failed to name. A uid with no passwd entry (containers, deleted users) is
+/// remembered across ticks so it does not force a refresh every second; any refresh
+/// (caused by a genuinely new uid) gives the remembered ones another chance.
+#[derive(Debug)]
+pub struct NameLookup<K> {
+    unknown: HashSet<K>,
+    refreshed_this_tick: bool,
+}
+
+impl<K> Default for NameLookup<K> {
+    fn default() -> Self {
+        Self {
+            unknown: HashSet::new(),
+            refreshed_this_tick: false,
+        }
     }
-    users
-        .get_user_by_id(&uid)
-        .map(|u| u.name().to_string())
-        .into()
+}
+
+impl<K: std::hash::Hash + Eq> NameLookup<K> {
+    pub fn begin_tick(&mut self) {
+        self.refreshed_this_tick = false;
+    }
+
+    /// The name of `key`. `lookup(key, refresh)` reads the name, re-reading the list
+    /// first when `refresh` is set.
+    pub fn resolve(
+        &mut self,
+        key: K,
+        lookup: &mut impl FnMut(&K, bool) -> Option<String>,
+    ) -> Option<String> {
+        if let Some(name) = lookup(&key, false) {
+            return Some(name);
+        }
+        if self.unknown.contains(&key) || self.refreshed_this_tick {
+            self.unknown.insert(key);
+            return None;
+        }
+        self.refreshed_this_tick = true;
+        self.unknown.clear();
+        let name = lookup(&key, true);
+        if name.is_none() {
+            self.unknown.insert(key);
+        }
+        name
+    }
 }
 
 #[cfg(test)]
@@ -413,6 +461,49 @@ mod tests {
             Ok(id(2)),
             "disabled: always read"
         );
+    }
+
+    #[test]
+    fn unknown_uids_do_not_refresh_the_user_list_every_tick() {
+        let mut names = NameLookup::default();
+        let mut refreshes = 0;
+        let mut known = vec![(0u32, "root".to_string())];
+        let mut lookup = |uid: &u32, refresh: bool| {
+            if refresh {
+                refreshes += 1;
+            }
+            known.iter().find(|(k, _)| k == uid).map(|(_, n)| n.clone())
+        };
+        for _tick in 0..5 {
+            names.begin_tick();
+            assert_eq!(names.resolve(0, &mut lookup).as_deref(), Some("root"));
+            assert_eq!(names.resolve(4242, &mut lookup), None);
+        }
+        assert_eq!(
+            refreshes, 1,
+            "only the first sighting of uid 4242 refreshes"
+        );
+
+        // A genuinely new uid refreshes (once per tick), and gives 4242 another chance.
+        known.push((501, "me".into()));
+        let mut refreshes = 0;
+        let mut lookup = |uid: &u32, refresh: bool| {
+            if refresh {
+                refreshes += 1;
+            }
+            known.iter().find(|(k, _)| k == uid).map(|(_, n)| n.clone())
+        };
+        names.begin_tick();
+        assert_eq!(names.resolve(501, &mut lookup).as_deref(), Some("me"));
+        assert_eq!(
+            names.resolve(777, &mut lookup),
+            None,
+            "no second refresh this tick"
+        );
+        names.begin_tick();
+        assert_eq!(names.resolve(777, &mut lookup), None);
+        assert_eq!(names.resolve(4242, &mut lookup), None);
+        assert_eq!(refreshes, 2);
     }
 
     #[test]
