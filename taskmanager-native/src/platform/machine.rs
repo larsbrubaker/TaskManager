@@ -20,7 +20,8 @@ fn text(value: Option<String>) -> Reading<String> {
         .into()
 }
 
-/// Read the machine's static facts. `sys` must have its CPU list and memory refreshed.
+/// Read the machine's static facts. `sys` must have its CPU list (read once, at start-up)
+/// and memory refreshed.
 pub fn read_machine_info(sys: &System, disks: &Disks, networks: &Networks) -> MachineInfo {
     let first_cpu = sys.cpus().first();
     let mut info = MachineInfo {

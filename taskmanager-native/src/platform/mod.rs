@@ -202,8 +202,9 @@ impl NativeProvider {
 
 impl TelemetryProvider for NativeProvider {
     fn machine_info(&mut self) -> MachineInfo {
-        self.sys
-            .refresh_cpu_list(CpuRefreshKind::nothing().with_frequency());
+        // Brand, vendor and core count come from the CPU list read at start-up. Re-listing
+        // CPUs here would recreate sysinfo's per-CPU state and turn the next load reading
+        // into an average since boot.
         self.sys.refresh_memory();
         self.disks
             .refresh_specifics(true, DiskRefreshKind::everything());

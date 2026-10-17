@@ -243,3 +243,25 @@ fn unreadable_disk_io_is_unavailable() {
     let me = row(&snapshot, std::process::id()).expect("we are listed");
     assert!(me.disk_total_read.is_value());
 }
+
+/// Re-reading the machine facts mid-run must not reset the CPU load baseline (sysinfo's
+/// `refresh_cpu_list` recreates its per-CPU state; `machine_info` must not call it). A
+/// reset still yields an in-range since-boot average, so this guards the shape (load
+/// stays a measured `Value` on every CPU) rather than proving the window.
+#[test]
+fn machine_info_between_samples_keeps_cpu_load_measured() {
+    let (mut provider, _services) = native_platform();
+    sample(&mut provider);
+    sleep(GAP);
+    let info = provider.machine_info();
+    assert!(info.cpu.brand.is_value());
+    sleep(GAP);
+    let after = sample(&mut provider);
+    let total = *after
+        .cpu
+        .total_pct
+        .value()
+        .expect("CPU load still measured");
+    assert!(total > 0.0 && total <= 100.0, "{total}");
+    assert!(after.cpu.per_cpu.iter().all(|c| c.util_pct.is_value()));
+}
