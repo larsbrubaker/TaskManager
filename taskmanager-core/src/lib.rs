@@ -14,16 +14,23 @@
 //! - [`fonts`] — theme + font installation, font sizes and the Font Awesome code points.
 //! - [`format`] — human-readable bytes, rates, percentages, temperatures and durations.
 //! - [`page`] — the destinations: ids, titles, sidebar labels and icons.
+//! - [`platform`] — the platform seam: `TelemetryProvider` and `PlatformServices` traits.
+//! - [`process`] — `ProcessKey`, the process table, grouping and the parent/child tree.
 //! - [`reading`] — `Reading<T>`: a measured value, or why there is none.
 //! - [`state`] — `AppState`: current page, theme, sidebar, status line.
+//! - [`telemetry`] — `Snapshot`, `MachineInfo`, `History`, `HistoryStore`, `SampleProducer`,
+//!   `TelemetryState` and `Sampler`.
 //! - [`theme`] — Light / Dark / Match System and the channel colours.
 //! - [`ui`] — the widget tree: the window chrome and the page host.
 
 pub mod fonts;
 pub mod format;
 pub mod page;
+pub mod platform;
+pub mod process;
 pub mod reading;
 pub mod state;
+pub mod telemetry;
 pub mod theme;
 pub mod ui;
 
@@ -31,8 +38,13 @@ use agg_gui::App;
 
 pub use fonts::{install_theme_and_fonts, Fonts};
 pub use page::{Page, ProcessorBrand};
+pub use platform::{ActionError, PlatformServices, ProviderHealth, TelemetryProvider};
+pub use process::{Pid, ProcessKey, ProcessTable};
 pub use reading::Reading;
 pub use state::AppState;
+pub use telemetry::{
+    History, HistoryStore, MachineInfo, SampleProducer, Sampler, SeriesId, Snapshot, TelemetryState,
+};
 pub use theme::ThemeChoice;
 
 /// The product name: window title, logo and status line.

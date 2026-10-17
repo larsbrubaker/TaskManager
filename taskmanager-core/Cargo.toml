@@ -17,6 +17,7 @@ description = "Target-agnostic core of TaskManager, a task manager and system mo
 
 [dependencies]
 agg-gui = { workspace = true }
+web-time = { workspace = true }
 
 [lib]
 crate-type = ["rlib"]

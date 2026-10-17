@@ -135,15 +135,32 @@ row; graphs break the line across non-`Value` samples.
   settable 0.5–5 s): system totals, per-CPU, memory composition, per-disk, per-NIC,
   GPU/NPU, power, thermals and the process table. Each snapshot gets the next
   **Generation** number.
-- **History** keeps a fixed-capacity ring per series (`Reading<f32>`), plus the
-  compressed-history view (older samples averaged into 2x/4x/8x buckets).
-- Natively the sampler runs on a worker thread and hands snapshots to the UI through
-  agg-gui's `ui_thread` drain; on wasm the demo sampler is stepped from the frame clock.
+- **History** keeps a fixed-capacity ring per series (`Reading<f32>`, 3600 samples by
+  default), plus the compressed-history view (older samples averaged into 2x/4x/8x
+  buckets aligned to the absolute sample count; a bucket with no values stays a gap).
+  `HistoryStore` maps `SeriesId` → `History` and pushes into every series each tick
+  (`Unavailable` for a device that vanished, back-fill for one that appeared).
+- Static facts (CPU, memory, disks, NICs, GPU/NPU) are a separate `MachineInfo`, read
+  when the sampler starts and on refresh.
+- Production and consumption are split: `SampleProducer` (owns the provider; drift-free
+  schedule, due time += interval, resync only when a whole interval behind; stamps
+  generation and health; keeps vanished processes as `Exited` rows for 3 s; when a
+  listing fails, `processes: Reading<ProcessTable>` comes back non-`Value` and the last
+  table is carried forward with live values `Unavailable`, never as a mass exit) emits
+  `Arc<Snapshot>`; `TelemetryState` (latest snapshot, `HistoryStore`,
+  `Arc<MachineInfo>`, health) ingests them. `Sampler` composes both on one thread.
+- Natively the `SampleProducer` runs on a worker thread and hands `Arc<Snapshot>`s to
+  the UI's `TelemetryState` through agg-gui's `ui_thread` drain; on wasm the demo
+  `Sampler` is stepped from the frame clock.
 
 ### 4.3 Providers: the platform seam
 
-`trait TelemetryProvider` (core) with one method per subsystem returning `Reading`s, and
-`trait PlatformServices` (core) for actions and inventories:
+`trait TelemetryProvider: Send` (core: `machine_info()`, `sample(now) -> Snapshot` with
+every field a `Reading` and rates computed by the provider, `health()`), and
+`trait PlatformServices` (core) for actions and inventories (M1 has `is_demo`,
+`end_process`, `open_url`; the rest arrive with their milestones). `PlatformServices` is
+`Send + Sync`; a platform's provider and services share state through `Arc<Mutex<…>>`
+(so ending a demo process removes it from the next demo snapshot):
 
 - actions: end task / force quit (identity-checked, see 4.4), reveal in file manager,
   open URL, enable/disable startup item, start/stop service, uninstall app (to Trash);
@@ -179,7 +196,11 @@ Implementations:
 
 ### 4.4 Process identity
 
-`ProcessKey { pid, start_time }`. Every action takes a `ProcessKey`, re-reads the target's
+`ProcessKey { pid, start_time }`, where `start_time` is the OS's fine-grained creation
+stamp, monotonic within a boot (Linux `/proc/<pid>/stat` starttime ticks; macOS
+`proc_pidinfo` start `tv_sec`+`tv_usec`; Windows `GetProcessTimes` creation FILETIME).
+sysinfo's one-second wall-clock `start_time` is not enough: a pid reused within the
+same second would keep its key. Every action takes a `ProcessKey`, re-reads the target's
 start time immediately before acting, and refuses (with a toast) if it changed. Selection
 in tables is by `ProcessKey` too, so a recycled PID never inherits a selection.
 
@@ -354,8 +375,10 @@ taskmanager-core/     rlib, everything testable, no platform code
   src/format.rs         bytes, rates, %, °C/°F, durations; sizes one decimal ("2.2 GB"),
                         rates three significant figures with "/sec" ("35.8 KB/sec")
   src/reading.rs        Reading<T>
-  src/telemetry/        Snapshot, Sampler, History (ring + compression), Generation
-  src/process/          ProcessKey, process table, grouping (apps/background), tree
+  src/telemetry/        snapshot (Snapshot), machine (MachineInfo), history (ring +
+                        compression), series (SeriesId, HistoryStore), producer
+                        (SampleProducer), state (TelemetryState), sampler (both)
+  src/process/          key (ProcessKey), table (rows, grouping, exited retention), tree
   src/platform.rs       TelemetryProvider + PlatformServices traits
   src/platform/demo/    DemoPlatform: simulated machine (all targets)
   src/platform/parse/   pure parsers (proc, meminfo, launchctl, netstat tables, …)

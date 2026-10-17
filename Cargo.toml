@@ -33,6 +33,8 @@ agg-gui-shell = "0.5.2"
 # Turn-key browser shell. Not published to crates.io yet, so it is a path dependency on the
 # sibling agg-gui checkout (CI clones it there too).
 agg-gui-web-shell = { path = "../agg-gui/agg-gui-web-shell" }
+# `Instant` that works on wasm32 (std's panics there); a re-export of std on native.
+web-time = "1.1"
 
 # ---------------------------------------------------------------------------
 # Local development override — see CLAUDE.md "Local development uses agg-gui
