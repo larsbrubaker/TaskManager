@@ -1,0 +1,25 @@
+/target
+**/target
+**/*.rs.bk
+
+# Visual references: third-party screenshots with machine identifiers. Never commit.
+/reference/
+
+# Web demo build outputs
+demo/node_modules
+demo/dist
+demo/public/pkg
+demo/bun.lock
+taskmanager-wasm/pkg
+
+# OS
+.DS_Store
+Thumbs.db
+
+# IDE
+.idea/
+.vscode/
+
+# Local agent state
+.claude/settings.local.json
+/dist
