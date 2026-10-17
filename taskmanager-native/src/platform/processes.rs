@@ -5,9 +5,10 @@
 //! (`os::read_identity`) to build its [`ProcessKey`] (PLAN §4.4). If the stamp cannot be
 //! read (permission: Windows protected processes) the key falls back to sysinfo's
 //! start time in whole seconds scaled to microseconds ([`fallback_stamp`]); such keys are
-//! reported in [`ProcessListing::fallback_keys`] so the services re-check them the same
-//! way. A fallback key is still unique in practice (a pid recycled within the same second
-//! would be needed to collide) but weaker than a real stamp. On macOS (via `kinfo_proc`)
+//! reported in [`ProcessListing::fallback_keys`], and the services refuse every action on
+//! them (`PermissionDenied`): an identity we cannot read is an identity we cannot verify.
+//! A fallback key still identifies the row in tables (a pid recycled within the same
+//! second would be needed to collide) but never authorises an action. On macOS (via `kinfo_proc`)
 //! and Linux (`/proc`) the stamp is readable for every process, so fallbacks are a
 //! Windows matter.
 //!
@@ -29,7 +30,8 @@ use super::os_api::{StampError, ThreadInfo};
 use super::rates::{per_second, CounterTracker};
 
 /// A process key's start stamp when the OS stamp is unreadable: sysinfo's start time
-/// (whole seconds since the epoch) in microseconds.
+/// (whole seconds since the epoch) in microseconds. Good enough to key a table row; the
+/// services refuse to act on such keys (`ActionError::PermissionDenied`).
 pub fn fallback_stamp(start_time_secs: u64) -> u64 {
     start_time_secs.saturating_mul(1_000_000)
 }

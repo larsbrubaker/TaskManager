@@ -15,8 +15,9 @@
 //!   re-checking its identity, open URLs.
 //!
 //! The halves share an `Arc<Mutex<Shared>>` (see `taskmanager_core::platform`): the
-//! provider records which published keys carry a fallback start stamp, so the services
-//! re-check those keys the same way they were made.
+//! provider records which published keys carry a fallback start stamp, and the services
+//! refuse to act on those keys (we could not read the process's identity, so we cannot
+//! verify it before acting).
 //!
 //! `Instant` is `std::time::Instant`: on native targets the core's `web_time::Instant` is
 //! a re-export of it.
@@ -53,10 +54,7 @@ use std::collections::HashSet;
 use std::sync::{Arc, Mutex, MutexGuard, PoisonError};
 use std::time::{Duration, Instant};
 
-use sysinfo::{
-    Components, CpuRefreshKind, DiskRefreshKind, Disks, Networks, ProcessRefreshKind,
-    ProcessesToUpdate, System, Users,
-};
+use sysinfo::{Components, CpuRefreshKind, DiskRefreshKind, Disks, Networks, System, Users};
 use taskmanager_core::telemetry::{CoreSample, CpuSample, MemorySample};
 use taskmanager_core::{
     ActionError, MachineInfo, PlatformServices, ProcessKey, ProviderHealth, Reading, Snapshot,
@@ -64,7 +62,7 @@ use taskmanager_core::{
 };
 
 use devices::DeviceSampler;
-use processes::{fallback_stamp, ProcessSampler};
+use processes::ProcessSampler;
 
 /// Build the native provider and services over one shared state.
 pub fn native_platform() -> (NativeProvider, NativeServices) {
@@ -275,25 +273,6 @@ pub struct NativeServices {
     shared: Arc<Mutex<Shared>>,
 }
 
-impl NativeServices {
-    /// Re-check a key made from a fallback stamp (sysinfo's whole-second start time).
-    fn verify_fallback_key(key: ProcessKey) -> Result<(), ActionError> {
-        let pid = sysinfo::Pid::from_u32(key.pid.0);
-        let mut sys = System::new();
-        sys.refresh_processes_specifics(
-            ProcessesToUpdate::Some(&[pid]),
-            true,
-            ProcessRefreshKind::nothing(),
-        );
-        let process = sys.process(pid).ok_or(ActionError::NotFound)?;
-        if fallback_stamp(process.start_time()) == key.start_time {
-            Ok(())
-        } else {
-            Err(ActionError::IdentityChanged)
-        }
-    }
-}
-
 impl PlatformServices for NativeServices {
     fn is_demo(&self) -> bool {
         false
@@ -303,14 +282,15 @@ impl PlatformServices for NativeServices {
     /// then end it: SIGTERM / SIGKILL on macOS and Linux; on Windows both a polite and a
     /// forced end call `TerminateProcess` for now (a polite WM_CLOSE path arrives with the
     /// Processes page, M5).
+    ///
+    /// A key whose stamp is a fallback (the OS refused to tell us the process's creation
+    /// time: Windows protected processes) is refused with `PermissionDenied`: we cannot
+    /// verify its identity, and the OS would not let us end it anyway.
     fn end_process(&self, key: ProcessKey, force: bool) -> Result<(), ActionError> {
-        let fallback = lock(&self.shared).fallback_keys.contains(&key);
-        if fallback {
-            Self::verify_fallback_key(key)?;
-            os::signal(key.pid.0, force)
-        } else {
-            os::end_verified(key, force)
+        if lock(&self.shared).fallback_keys.contains(&key) {
+            return Err(ActionError::PermissionDenied);
         }
+        os::end_verified(key, force)
     }
 
     /// Open an `http`/`https` URL in the user's browser; other schemes are refused so

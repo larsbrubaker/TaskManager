@@ -152,13 +152,6 @@ pub fn end_verified(key: ProcessKey, _force: bool) -> Result<(), ActionError> {
     terminate(&handle)
 }
 
-/// Terminate `pid` without re-checking its identity (the caller did, another way).
-pub fn signal(pid: u32, _force: bool) -> Result<(), ActionError> {
-    let handle =
-        OwnedHandle::open(pid, PROCESS_TERMINATE).map_err(StampError::into_action_error)?;
-    terminate(&handle)
-}
-
 fn terminate(handle: &OwnedHandle) -> Result<(), ActionError> {
     // SAFETY: open handle with PROCESS_TERMINATE; exit code 1.
     let ok = unsafe { TerminateProcess(handle.0, 1) };

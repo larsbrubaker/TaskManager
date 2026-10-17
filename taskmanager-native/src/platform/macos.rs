@@ -188,11 +188,6 @@ pub fn end_verified(key: ProcessKey, force: bool) -> Result<(), ActionError> {
     unix::signal(key.pid.0, force)
 }
 
-/// Signal `pid` without re-checking its identity (the caller did, another way).
-pub fn signal(pid: u32, force: bool) -> Result<(), ActionError> {
-    unix::signal(pid, force)
-}
-
 /// Whether `mount` is the volume macOS boots from.
 pub fn is_system_mount(mount: &std::path::Path) -> bool {
     mount == std::path::Path::new("/")

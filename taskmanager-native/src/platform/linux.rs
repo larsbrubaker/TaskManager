@@ -139,11 +139,6 @@ pub fn end_verified(key: ProcessKey, force: bool) -> Result<(), ActionError> {
     }
 }
 
-/// Signal `pid` without re-checking its identity (the caller did, another way).
-pub fn signal(pid: u32, force: bool) -> Result<(), ActionError> {
-    unix::signal(pid, force)
-}
-
 /// Whether `mount` is the root file system.
 pub fn is_system_mount(mount: &Path) -> bool {
     mount == Path::new("/")

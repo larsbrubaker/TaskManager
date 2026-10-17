@@ -7,6 +7,9 @@ use std::process::{Child, Command, Stdio};
 use std::thread::sleep;
 
 use super::*;
+use processes::fallback_stamp;
+#[cfg(target_os = "macos")]
+use sysinfo::ProcessesToUpdate;
 use taskmanager_core::process::ProcessRow;
 
 /// Long enough between samples for sysinfo's CPU deltas.
@@ -200,4 +203,24 @@ fn health_reports_the_latest_sample() {
         ProviderHealth::Healthy => {}
         ProviderHealth::Degraded(why) => assert!(!why.is_empty()),
     }
+}
+
+#[test]
+fn fallback_keys_are_never_acted_on() {
+    let (_provider, services) = native_platform();
+    let mut child = spawn_sleeper();
+    let pid = child.id();
+    // Pretend the provider could only key the child by sysinfo's whole seconds.
+    let key = ProcessKey::new(pid, fallback_stamp(1_700_000_000));
+    lock(&services.shared).fallback_keys.insert(key);
+    assert_eq!(
+        services.end_process(key, true),
+        Err(ActionError::PermissionDenied)
+    );
+    assert!(
+        child.try_wait().expect("query the child").is_none(),
+        "still running"
+    );
+    child.kill().expect("kill the child");
+    child.wait().expect("reap the child");
 }
