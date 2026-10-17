@@ -188,6 +188,12 @@ pub fn end_verified(key: ProcessKey, force: bool) -> Result<(), ActionError> {
     unix::signal(key.pid.0, force)
 }
 
+/// Whether process `pid`'s disk I/O counters are readable: sysinfo's macOS I/O counters come with the task info it reads; processes it may not
+/// inspect are already blanked through `ZERO_USAGE_MEANS_DENIED`.
+pub fn disk_io_readable(_pid: u32) -> bool {
+    true
+}
+
 /// Whether `mount` is the volume macOS boots from.
 pub fn is_system_mount(mount: &std::path::Path) -> bool {
     mount == std::path::Path::new("/")

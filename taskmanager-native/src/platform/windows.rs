@@ -172,6 +172,12 @@ pub fn sysinfo_uid(_uid: u32) -> Option<sysinfo::Uid> {
     None
 }
 
+/// Whether process `pid`'s disk I/O counters are readable: sysinfo's Windows I/O counters come from the process handle it opens; processes it
+/// cannot open are already blanked through `ZERO_USAGE_MEANS_DENIED`.
+pub fn disk_io_readable(_pid: u32) -> bool {
+    true
+}
+
 /// Whether `mount` is the system drive (`%SystemDrive%\`, normally `C:\`).
 pub fn is_system_mount(mount: &Path) -> bool {
     let drive = std::env::var("SystemDrive").unwrap_or_else(|_| "C:".into());

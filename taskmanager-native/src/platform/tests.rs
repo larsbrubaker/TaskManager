@@ -224,3 +224,22 @@ fn fallback_keys_are_never_acted_on() {
     child.kill().expect("kill the child");
     child.wait().expect("reap the child");
 }
+
+/// Another user's I/O counters are unreadable on Linux: their disk figures are gaps, not 0.
+#[cfg(target_os = "linux")]
+#[test]
+fn unreadable_disk_io_is_unavailable() {
+    // SAFETY: `geteuid` has no preconditions.
+    if unsafe { libc::geteuid() } == 0 {
+        return; // root reads everything
+    }
+    let (mut provider, _services) = native_platform();
+    sample(&mut provider);
+    sleep(GAP);
+    let snapshot = sample(&mut provider);
+    let init = row(&snapshot, 1).expect("pid 1 is listed");
+    assert!(!os::disk_io_readable(1));
+    assert!(init.disk_total_read.is_unavailable() && init.disk_read_bps.is_unavailable());
+    let me = row(&snapshot, std::process::id()).expect("we are listed");
+    assert!(me.disk_total_read.is_value());
+}

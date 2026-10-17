@@ -9,6 +9,8 @@
 //!   (PLAN §4.4) and, where the same read gives it, the thread count;
 //! - `end_verified(key, force)` — re-read the stamp, refuse on mismatch, then end the
 //!   process;
+//! - `disk_io_readable(pid)` — whether sysinfo's disk counters for a process are a
+//!   measurement rather than a zero it reports for an unreadable counter;
 //! - `is_system_mount(path)` — whether a volume is the one the OS boots from;
 //! - `sysinfo_uid(u32) -> Option<sysinfo::Uid>` — a raw uid from an identity read as
 //!   sysinfo's `Uid` (Unix; `None` on Windows);

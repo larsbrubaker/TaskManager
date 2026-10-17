@@ -182,7 +182,9 @@ impl ProcessSampler {
     }
 
     /// CPU share and time, memory, disk rates and totals. On platforms where sysinfo's
-    /// all-zero usage means "not allowed to read", those stay `Unavailable`.
+    /// all-zero usage means "not allowed to read", those stay `Unavailable`; disk figures
+    /// also stay `Unavailable` when the OS module says the I/O counters are unreadable
+    /// (Linux `/proc/<pid>/io` of another user's process).
     fn fill_usage(
         &mut self,
         row: &mut ProcessRow,
@@ -201,6 +203,11 @@ impl ProcessSampler {
         row.cpu_pct = cpu_share(self.cpu_ms.delta(key, cpu_ms), elapsed, logical_cpus);
         row.cpu_time = Reading::Value(Duration::from_millis(cpu_ms));
         row.memory = Reading::Value(memory);
+        // sysinfo reports 0 bytes for I/O counters it could not read; only a readable
+        // counter is a measurement.
+        if !os::disk_io_readable(row.key.pid.0) {
+            return;
+        }
         row.disk_read_bps = self.disk_read.rate(key, disk.total_read_bytes, elapsed);
         row.disk_write_bps = self
             .disk_written

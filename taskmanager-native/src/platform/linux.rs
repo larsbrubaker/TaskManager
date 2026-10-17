@@ -8,6 +8,8 @@
 //! - Ending a process: a pidfd (`pidfd_open`, Linux 5.3+) is opened first, the stamp is
 //!   re-checked, and the signal goes through the pidfd, so a pid recycled between the
 //!   check and the signal cannot be hit. Older kernels fall back to `kill`.
+//! - Disk I/O per process: only where `/proc/<pid>/io` is readable (`disk_io_readable`);
+//!   elsewhere sysinfo's zeros become `Unavailable`.
 //! - Kernel CPU split: `/proc/stat` per-CPU system + irq + softirq tick deltas.
 //! - Memory composition: `/proc/meminfo` (cached = `Cached` + `Buffers`, committed =
 //!   `Committed_AS`, compressed = `Zswap` when the kernel reports it) and PSI
@@ -137,6 +139,18 @@ pub fn end_verified(key: ProcessKey, force: bool) -> Result<(), ActionError> {
             unix::signal(key.pid.0, force)
         }
     }
+}
+
+/// Whether we may read process `pid`'s I/O counters (`/proc/<pid>/io` is mode 0400,
+/// owned by the process's user, and the kernel also requires ptrace-read access, so other
+/// users' processes are unreadable unless we are root). sysinfo reports 0 bytes when the
+/// read fails, which must not be shown as a measured zero.
+pub fn disk_io_readable(pid: u32) -> bool {
+    let Ok(path) = std::ffi::CString::new(format!("/proc/{pid}/io")) else {
+        return false;
+    };
+    // SAFETY: `path` is a valid NUL-terminated string; `access` only reads it.
+    unsafe { libc::access(path.as_ptr(), libc::R_OK) == 0 }
 }
 
 /// Whether `mount` is the root file system.
