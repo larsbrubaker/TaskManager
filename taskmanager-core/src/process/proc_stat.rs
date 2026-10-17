@@ -9,6 +9,9 @@
 //! The awkward part is field 2, `comm`: the executable name in parentheses, which may
 //! itself contain spaces and parentheses (`(my (odd) prog)`). The kernel never escapes it,
 //! so the only reliable split is at the *last* `)` in the line.
+//!
+//! Field 20, `num_threads`, comes along for free (the platform reads this file anyway), so
+//! the platform need not walk `/proc/<pid>/task/` to count threads.
 
 /// The fields of `/proc/<pid>/stat` TaskManager uses.
 #[derive(Clone, Debug, PartialEq, Eq)]
@@ -21,6 +24,8 @@ pub struct ProcPidStat {
     pub state: char,
     /// Field 4.
     pub ppid: u32,
+    /// Field 20.
+    pub num_threads: u32,
     /// Field 22: start time in clock ticks after boot.
     pub start_ticks: u64,
 }
@@ -43,12 +48,14 @@ pub fn parse_proc_pid_stat(text: &str) -> Option<ProcPidStat> {
         return None;
     }
     let ppid = rest.get(4 - 3)?.parse().ok()?;
+    let num_threads = rest.get(20 - 3)?.parse().ok()?;
     let start_ticks = rest.get(22 - 3)?.parse().ok()?;
     Some(ProcPidStat {
         pid,
         comm,
         state,
         ppid,
+        num_threads,
         start_ticks,
     })
 }
@@ -72,6 +79,7 @@ mod tests {
                 comm: "systemd".into(),
                 state: 'S',
                 ppid: 0,
+                num_threads: 1,
                 start_ticks: 12,
             }
         );
@@ -86,6 +94,7 @@ mod tests {
         assert_eq!(stat.comm, "Web (Content) 2");
         assert_eq!(stat.state, 'R');
         assert_eq!(stat.ppid, 4100);
+        assert_eq!(stat.num_threads, 27);
         assert_eq!(stat.start_ticks, 987_654_321);
     }
 

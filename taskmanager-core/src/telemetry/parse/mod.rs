@@ -4,12 +4,14 @@
 //! - [`procfs`] — Linux `/proc/stat` CPU times, `/proc/meminfo`, PSI pressure,
 //!   `/proc/loadavg` threads.
 //! - [`sysfs`] — Linux `/sys` CPU cache descriptions and link speed.
+//! - [`logical_processor`] — Windows `GetLogicalProcessorInformationEx` cache records.
 //! - [`net`] — interface kind from its name; macOS `networksetup` hardware ports.
 //!
 //! Per-process formats live with the process model (`process::proc_stat`,
 //! `process::desktop`). PLAN §6 sketches these under `platform/parse/`; they sit here
 //! until the platform module (being built in parallel) settles.
 
+pub mod logical_processor;
 pub mod net;
 pub mod procfs;
 pub mod sysfs;
