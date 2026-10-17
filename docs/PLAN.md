@@ -22,9 +22,9 @@ proportions, type, colours and meter/graph look; data and exact pixels may diffe
 - **Design only.** Inputs are screenshots, the public website copy and using the app as
   a user. No disassembly, no resource extraction, no copying of TMOG's strings beyond
   ordinary UI words ("Processes", "Memory usage"), no TMOG wordmark or logo.
-- **Our own identity.** Product name *TaskManager*; our own logo (a heartbeat line drawn
-  by our own graph renderer, in the spirit of a monitor, not a copy of TMOG's
-  wordmark); our own app icon.
+- **Our own identity.** Product name *TaskManager*; our own logo (three flat LED meter columns in
+  the CPU, memory and GPU channel colours beside the word; deliberately not a glowing
+  heartbeat like TMOG's mark); our own app icon.
 - **No Pro tier.** Every one of TMOG's pages is a live, free feature in ours. There is no
   upgrade banner, licence key, "Get PRO Version" link or SAMPLE watermark.
 - **No phosphor themes, no popout skins.** We ship agg-gui's **Light** and **Dark**
