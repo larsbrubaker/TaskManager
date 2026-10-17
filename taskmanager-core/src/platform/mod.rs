@@ -31,8 +31,10 @@
 //!
 //! Submodules:
 //! - [`demo`] — the seeded simulated machine (`demo_platform(seed)`), on every target.
+//! - [`parse`] — pure parsers for the OS formats the native platform reads.
 
 pub mod demo;
+pub mod parse;
 
 use std::fmt;
 

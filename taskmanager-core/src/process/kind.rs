@@ -11,7 +11,7 @@
 //!   Contents/MacOS/X Helper`), XPC services and login items inside an app are Background
 //!   children of the app.
 //! - Windows: owning a visible, unowned top-level window (the native side enumerates them).
-//! - Linux: launched by a visible `.desktop` entry (see [`super::desktop`]).
+//! - Linux: launched by a visible `.desktop` entry (see `crate::platform::parse::desktop`).
 
 /// Whether `exe` is the main executable of a top-level macOS application bundle.
 pub fn is_macos_bundle_main_executable(exe: &str) -> bool {

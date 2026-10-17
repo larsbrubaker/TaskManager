@@ -12,11 +12,9 @@
 //! - [`state`] — `TelemetryState`, the UI side: latest snapshot, history, machine info,
 //!   health.
 //! - [`sampler`] — `Sampler`, both halves on one thread (wasm, demo, tests).
-//! - [`parse`] — pure parsers for the OS text the native platform reads.
 
 pub mod history;
 pub mod machine;
-pub mod parse;
 pub mod producer;
 pub mod sampler;
 pub mod series;

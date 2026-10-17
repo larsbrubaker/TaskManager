@@ -25,8 +25,8 @@
 use std::ffi::{c_int, c_void, CString};
 use std::mem::{size_of, MaybeUninit};
 
+use taskmanager_core::platform::parse::net::{parse_hardware_ports, HardwarePort};
 use taskmanager_core::process::kind::is_macos_bundle_main_executable;
-use taskmanager_core::telemetry::parse::net::{parse_hardware_ports, HardwarePort};
 use taskmanager_core::telemetry::{
     CoreClass, MachineInfo, MemorySample, NetInfo, NetKind, PressureLevel,
 };

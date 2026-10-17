@@ -19,7 +19,7 @@ use std::net::{IpAddr, UdpSocket};
 use std::time::Duration;
 
 use sysinfo::{Components, Disk, DiskRefreshKind, Disks, Networks};
-use taskmanager_core::telemetry::parse::net::net_kind_from_name;
+use taskmanager_core::platform::parse::net::net_kind_from_name;
 use taskmanager_core::telemetry::{
     DiskInfo, DiskKind, DiskSample, NetInfo, NetKind, NetSample, SensorKind, SensorSample,
 };

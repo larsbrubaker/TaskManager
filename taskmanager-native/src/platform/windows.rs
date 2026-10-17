@@ -26,7 +26,7 @@
 use std::collections::{HashMap, HashSet};
 use std::path::Path;
 
-use taskmanager_core::telemetry::parse::logical_processor::parse_logical_processor_caches;
+use taskmanager_core::platform::parse::logical_processor::parse_logical_processor_caches;
 use taskmanager_core::telemetry::{MachineInfo, MemorySample};
 use taskmanager_core::{ActionError, ProcessKey, Reading};
 use windows_sys::core::BOOL;

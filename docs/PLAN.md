@@ -382,10 +382,14 @@ taskmanager-core/     rlib, everything testable, no platform code
   src/telemetry/        snapshot (Snapshot), machine (MachineInfo), history (ring +
                         compression), series (SeriesId, HistoryStore), producer
                         (SampleProducer), state (TelemetryState), sampler (both)
-  src/process/          key (ProcessKey), table (rows, grouping, exited retention), tree
-  src/platform.rs       TelemetryProvider + PlatformServices traits
+  src/process/          key (ProcessKey), table (rows, grouping, exited retention), tree,
+                        kind (Application / Background heuristics)
+  src/platform/mod.rs   TelemetryProvider + PlatformServices traits
   src/platform/demo/    demo platform: simulated machine, demo_platform(seed) (all targets)
-  src/platform/parse/   pure parsers (proc, meminfo, launchctl, netstat tables, …)
+  src/platform/parse/   pure parsers: proc_stat (/proc/<pid>/stat), procfs (stat, meminfo,
+                        PSI, loadavg), sysfs (caches, link speed), desktop (.desktop),
+                        net (interface kinds, networksetup), logical_processor (Windows
+                        cache records); later launchctl, netstat tables, …
   src/recorder/         .tmtrace writer/reader, replay clock
   src/settings.rs       persisted settings (JSON) + SettingsStore trait
   src/state/            AppState: current page, theme state (choice, OS appearance,
@@ -395,8 +399,10 @@ taskmanager-core/     rlib, everything testable, no platform code
   tests/                headless UI tests per page, file_line_count, parsers
   examples/             screenshot_pages (render every page to PNG from the demo),
                         compare_refs (side-by-side with reference/ for review)
-taskmanager-native/   bin `taskmanager`: agg-gui-shell + NativePlatform (sysinfo +
-                        platform/{macos,windows,linux}.rs), CLI, persistence, menu bar
+taskmanager-native/   bin `taskmanager`: agg-gui-shell + NativePlatform (platform/: mod.rs
+                        provider + services, processes, devices, machine, rates, sysinfo
+                        base + {macos,windows,linux,unix}.rs), CLI (cli.rs, dump.rs for
+                        --dump-snapshot), persistence, menu bar
 taskmanager-wasm/     cdylib: agg-gui-web-shell + DemoPlatform
 demo/                 static page + bun/vite bundle for GitHub Pages
 ```

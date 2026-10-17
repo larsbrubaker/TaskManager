@@ -1,7 +1,6 @@
 //! Linux extras for the native platform: what sysinfo does not give us (PLAN §4.3), read
 //! from `/proc` and `/sys` and parsed by the core's pure parsers
-//! (`taskmanager_core::process::proc_stat`, `…::desktop`, `telemetry::parse::{procfs,
-//! sysfs}`).
+//! (`taskmanager_core::platform::parse::{proc_stat, desktop, procfs, sysfs}`).
 //!
 //! - Process identity: `/proc/<pid>/stat` field 22 `starttime` (clock ticks since boot),
 //!   the fine-grained per-boot stamp `ProcessKey` needs (PLAN §4.4); field 20 gives the
@@ -27,14 +26,14 @@ use std::ffi::c_int;
 use std::fs;
 use std::path::{Path, PathBuf};
 
-use taskmanager_core::process::desktop::{
+use taskmanager_core::platform::parse::desktop::{
     launcher_programs, parse_desktop_entry, program_file_name, DesktopEntry,
 };
-use taskmanager_core::process::proc_stat::parse_proc_pid_stat;
-use taskmanager_core::telemetry::parse::procfs::{
+use taskmanager_core::platform::parse::proc_stat::parse_proc_pid_stat;
+use taskmanager_core::platform::parse::procfs::{
     parse_loadavg_threads, parse_meminfo, parse_proc_stat_cpus, parse_psi, CpuTimes,
 };
-use taskmanager_core::telemetry::parse::sysfs::{
+use taskmanager_core::platform::parse::sysfs::{
     cache_totals, parse_cache_size, parse_link_speed_bps, CacheEntry,
 };
 use taskmanager_core::telemetry::{MachineInfo, MemorySample, NetInfo, NetKind};
