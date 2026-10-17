@@ -27,6 +27,11 @@
 //!
 //! `std::sync::Mutex` works on wasm32 too (single-threaded there, so it never blocks).
 //! Hold the lock only for the duration of one call, never across a sample.
+//!
+//! Submodules:
+//! - [`demo`] — the seeded simulated machine (`demo_platform(seed)`), on every target.
+
+pub mod demo;
 
 use std::fmt;
 
