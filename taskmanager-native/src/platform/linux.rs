@@ -46,6 +46,9 @@ use super::os_api::{Identity, KernelSplit, StampError, ThreadInfo};
 use super::unix;
 pub use super::unix::{process_cpu_time, sysinfo_uid};
 
+/// Whether sysinfo's CPU frequency is a live reading: sysinfo reads each CPU's live `scaling_cur_freq`.
+pub const LIVE_CPU_FREQUENCY: bool = true;
+
 /// Whether identity reads are cached per (pid, start second) across ticks: `/proc/<pid>/stat` is read every tick anyway: it also gives the thread count.
 pub const CACHE_IDENTITY: bool = false;
 

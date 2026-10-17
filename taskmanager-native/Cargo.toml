@@ -1,6 +1,6 @@
 # taskmanager-native: the desktop shell. agg-gui-shell owns the window and event loop; this
-# crate names and sizes the window and hands it the root widget from taskmanager-core (the
-# real OS telemetry provider arrives in M1).
+# crate names and sizes the window, hands it the root widget from taskmanager-core, and
+# provides NativePlatform (src/platform/: sysinfo plus per-OS code) and the CLI.
 [package]
 name = "taskmanager-native"
 version.workspace = true

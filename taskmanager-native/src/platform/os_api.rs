@@ -5,6 +5,8 @@
 //!
 //! - `ZERO_USAGE_MEANS_DENIED: bool` — whether sysinfo's all-zero memory and CPU time for
 //!   a process means "not allowed to read" rather than a measured zero;
+//! - `LIVE_CPU_FREQUENCY: bool` — whether sysinfo's CPU clock is the current speed (when
+//!   it is only nominal, `CpuSample::frequency_mhz` is `Unavailable`);
 //! - `CACHE_IDENTITY: bool` — whether `processes::IdentityCache` may reuse identity reads
 //!   across ticks;
 //! - `read_identity(pid) -> Result<Identity, StampError>` — the fine-grained start stamp

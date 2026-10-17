@@ -36,6 +36,10 @@ pub fn disk_id(disk: &Disk) -> String {
 /// Whether a sysinfo volume is worth listing: it has capacity, and it is not a second
 /// mount of a volume already listed (same device name and capacity, as with macOS's
 /// read-only system volume and its data volume sharing one APFS container).
+///
+/// TODO(M4): this is a volume view; replace it with physical disks (IOKit on macOS,
+/// `/proc/diskstats` on Linux, `PhysicalDriveN` on Windows) so APFS containers, RAID
+/// members and multi-partition drives map to one device each.
 fn listed_disks(disks: &Disks) -> Vec<&Disk> {
     let mut seen: Vec<(String, u64)> = Vec::new();
     let mut out = Vec::new();

@@ -38,6 +38,11 @@ use super::rates::delta_between;
 use super::unix;
 pub use super::unix::{process_cpu_time, sysinfo_uid};
 
+/// Whether sysinfo's CPU frequency is a live reading: sysinfo reports the nominal clock on macOS (`hw.cpufrequency` on Intel, a fixed
+/// per-chip value on Apple silicon, where the OS manages clocks per cluster), not the live
+/// speed, so the UI must not show it as current speed.
+pub const LIVE_CPU_FREQUENCY: bool = false;
+
 /// Whether identity reads are cached per (pid, start second) across ticks: `proc_pidinfo` / `kinfo_proc` reads are per-process syscalls worth caching.
 pub const CACHE_IDENTITY: bool = true;
 

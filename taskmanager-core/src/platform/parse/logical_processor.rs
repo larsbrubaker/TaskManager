@@ -34,12 +34,16 @@ pub fn parse_logical_processor_caches(buf: &[u8]) -> CacheTotals {
     };
     let mut totals = CacheTotals::default();
     let mut offset = 0usize;
-    while offset + 8 <= buf.len() {
+    while offset
+        .checked_add(8)
+        .is_some_and(|header_end| header_end <= buf.len())
+    {
         let (Some(relationship), Some(size)) = (read_i32(offset), read_u32(offset + 4)) else {
             break;
         };
         let size = size as usize;
-        if size < 8 || offset + size > buf.len() {
+        let record_end = offset.checked_add(size);
+        if size < 8 || record_end.is_none_or(|end| end > buf.len()) {
             break;
         }
         if relationship == RELATION_CACHE && size >= MIN_CACHE_RECORD {

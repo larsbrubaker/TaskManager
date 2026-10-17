@@ -52,6 +52,9 @@ use windows_sys::Win32::UI::WindowsAndMessaging::{
 
 use super::os_api::{Identity, KernelSplit, StampError, ThreadInfo};
 
+/// Whether sysinfo's CPU frequency is a live reading: sysinfo reads the processors' current MHz from the power manager.
+pub const LIVE_CPU_FREQUENCY: bool = true;
+
 /// Whether identity reads are cached per (pid, start second) across ticks: `OpenProcess` + `GetProcessTimes` per process are worth caching.
 pub const CACHE_IDENTITY: bool = true;
 

@@ -143,7 +143,8 @@ impl NativeProvider {
             .filter(|f| *f > 0.0)
             .collect();
         let mut sample = CpuSample {
-            frequency_mhz: if clocks.is_empty() {
+            // A nominal clock (macOS) would read as a misleading constant "speed".
+            frequency_mhz: if clocks.is_empty() || !os::LIVE_CPU_FREQUENCY {
                 Reading::Unavailable
             } else {
                 Reading::Value(clocks.iter().sum::<f32>() / clocks.len() as f32)

@@ -74,6 +74,9 @@ fn a_real_sample_is_plausible() {
     let total = *second.cpu.total_pct.value().expect("CPU load measured");
     assert!((0.0..=100.0).contains(&total));
     assert_eq!(second.cpu.per_cpu.len(), info.cpu.logical_cores);
+    // macOS only reports a nominal clock; it must not pose as the live speed.
+    #[cfg(target_os = "macos")]
+    assert!(second.cpu.frequency_mhz.is_unavailable());
     for core in &second.cpu.per_cpu {
         let util = *core.util_pct.value().expect("per-core load measured");
         assert!((0.0..=100.0).contains(&util));
