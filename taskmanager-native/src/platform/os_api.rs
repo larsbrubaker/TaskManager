@@ -11,6 +11,7 @@
 //!   process;
 //! - `disk_io_readable(pid)` — whether sysinfo's disk counters for a process are a
 //!   measurement rather than a zero it reports for an unreadable counter;
+//! - `process_cpu_time()` — our own CPU time so far (for `TASKMANAGER_STATS`);
 //! - `is_system_mount(path)` — whether a volume is the one the OS boots from;
 //! - `sysinfo_uid(u32) -> Option<sysinfo::Uid>` — a raw uid from an identity read as
 //!   sysinfo's `Uid` (Unix; `None` on Windows);

@@ -42,8 +42,8 @@ use windows_sys::Win32::System::SystemInformation::{
     GetLogicalProcessorInformationEx, RelationCache, SYSTEM_LOGICAL_PROCESSOR_INFORMATION_EX,
 };
 use windows_sys::Win32::System::Threading::{
-    GetExitCodeProcess, GetProcessTimes, GetSystemTimes, OpenProcess, TerminateProcess,
-    PROCESS_QUERY_LIMITED_INFORMATION, PROCESS_TERMINATE,
+    GetCurrentProcess, GetExitCodeProcess, GetProcessTimes, GetSystemTimes, OpenProcess,
+    TerminateProcess, PROCESS_QUERY_LIMITED_INFORMATION, PROCESS_TERMINATE,
 };
 use windows_sys::Win32::UI::WindowsAndMessaging::{
     EnumWindows, GetWindow, GetWindowTextLengthW, GetWindowThreadProcessId, IsWindowVisible,
@@ -165,6 +165,26 @@ fn terminate(handle: &OwnedHandle) -> Result<(), ActionError> {
             std::io::Error::from_raw_os_error(other as i32).to_string(),
         )),
     }
+}
+
+/// CPU time (user + kernel) this process has used so far.
+pub fn process_cpu_time() -> Option<std::time::Duration> {
+    let zero = FILETIME {
+        dwLowDateTime: 0,
+        dwHighDateTime: 0,
+    };
+    let mut times = [zero; 4];
+    let [creation, exit, kernel, user] = &mut times;
+    // SAFETY: `GetCurrentProcess` returns a pseudo-handle that needs no closing; the four
+    // out-pointers are distinct, writable FILETIMEs.
+    let ok = unsafe { GetProcessTimes(GetCurrentProcess(), creation, exit, kernel, user) };
+    if ok == 0 {
+        return None;
+    }
+    // FILETIME durations are 100 ns units.
+    Some(std::time::Duration::from_nanos(
+        (filetime(times[2]) + filetime(times[3])).saturating_mul(100),
+    ))
 }
 
 /// Raw uids never occur on Windows (owners are SIDs, and identity reads report none).

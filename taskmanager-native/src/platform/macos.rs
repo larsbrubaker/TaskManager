@@ -35,7 +35,7 @@ use taskmanager_core::{ActionError, ProcessKey, Reading};
 use super::os_api::{Identity, KernelSplit, StampError, ThreadInfo};
 use super::rates::delta_between;
 use super::unix;
-pub use super::unix::sysinfo_uid;
+pub use super::unix::{process_cpu_time, sysinfo_uid};
 
 /// On macOS, sysinfo reports zero memory and CPU time for processes it may not inspect
 /// (other users' processes without root), so an all-zero row means "not readable".

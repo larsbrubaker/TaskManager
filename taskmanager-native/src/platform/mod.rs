@@ -30,6 +30,7 @@ mod machine;
 mod os_api;
 mod processes;
 mod rates;
+mod stats;
 
 #[cfg(target_os = "linux")]
 mod linux;
@@ -99,6 +100,8 @@ pub struct NativeProvider {
     devices: DeviceSampler,
     previous_at: Option<Instant>,
     health: ProviderHealth,
+    /// `TASKMANAGER_STATS=1`: print per-sample timing ([`stats`]).
+    stats: bool,
 }
 
 impl NativeProvider {
@@ -120,6 +123,7 @@ impl NativeProvider {
             devices: DeviceSampler::default(),
             previous_at: None,
             health: ProviderHealth::Healthy,
+            stats: stats::stats_enabled(std::env::var(stats::STATS_ENV).ok().as_deref()),
         }
     }
 
@@ -218,13 +222,17 @@ impl TelemetryProvider for NativeProvider {
         let mut snapshot = Snapshot::new(now);
         snapshot.elapsed = elapsed.unwrap_or_default();
         let mut issues = Vec::new();
+        let mut timer = stats::SampleTimer::start(self.stats);
 
         snapshot.cpu = self.sample_cpu(elapsed.is_some(), &mut issues);
+        timer.mark("cpu");
         snapshot.memory = self.sample_memory(&mut issues);
+        timer.mark("memory");
         let threads = self.threads.sample().map_err(|why| {
             issues.push(format!("thread count unavailable: {why}"));
         });
         let threads = threads.ok();
+        timer.mark("threads");
         let thread_total = threads.as_ref().map_or(Reading::Unavailable, |t| t.total);
         match self.processes.sample(
             &mut self.sys,
@@ -248,9 +256,13 @@ impl TelemetryProvider for NativeProvider {
                 snapshot.processes = Reading::Unavailable;
             }
         }
+        timer.mark("processes");
         snapshot.disks = self.devices.disks(&mut self.disks, elapsed);
+        timer.mark("disks");
         snapshot.networks = self.devices.networks(&mut self.networks, elapsed);
+        timer.mark("networks");
         snapshot.sensors = devices::sensors(&mut self.components);
+        timer.mark("sensors");
         snapshot.uptime = match System::uptime() {
             0 => Reading::Unavailable,
             secs => Reading::Value(Duration::from_secs(secs)),
@@ -261,6 +273,7 @@ impl TelemetryProvider for NativeProvider {
         } else {
             ProviderHealth::Degraded(issues.join("; "))
         };
+        timer.finish();
         snapshot
     }
 

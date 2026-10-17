@@ -43,7 +43,7 @@ use taskmanager_core::{ActionError, ProcessKey, Reading};
 
 use super::os_api::{Identity, KernelSplit, StampError, ThreadInfo};
 use super::unix;
-pub use super::unix::sysinfo_uid;
+pub use super::unix::{process_cpu_time, sysinfo_uid};
 
 /// `/proc` is readable for every process, so sysinfo's zeros are measured zeros (kernel
 /// threads really have no user memory).

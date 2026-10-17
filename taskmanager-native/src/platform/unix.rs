@@ -12,6 +12,23 @@ pub fn sysinfo_uid(uid: u32) -> Option<sysinfo::Uid> {
     sysinfo::Uid::try_from(uid as usize).ok()
 }
 
+/// CPU time (user + system) this process has used so far.
+pub fn process_cpu_time() -> Option<std::time::Duration> {
+    let mut usage = std::mem::MaybeUninit::<libc::rusage>::zeroed();
+    // SAFETY: `usage` is a writable `rusage`; `getrusage` fills it on success.
+    if unsafe { libc::getrusage(libc::RUSAGE_SELF, usage.as_mut_ptr()) } != 0 {
+        return None;
+    }
+    // SAFETY: zero-initialised plain data, filled by the kernel.
+    let usage = unsafe { usage.assume_init() };
+    let micros = |t: libc::timeval| {
+        u64::try_from(t.tv_sec).unwrap_or(0) * 1_000_000 + u64::try_from(t.tv_usec).unwrap_or(0)
+    };
+    Some(std::time::Duration::from_micros(
+        micros(usage.ru_utime) + micros(usage.ru_stime),
+    ))
+}
+
 /// The calling thread's `errno` after a failed libc call.
 pub fn errno() -> i32 {
     std::io::Error::last_os_error().raw_os_error().unwrap_or(0)
