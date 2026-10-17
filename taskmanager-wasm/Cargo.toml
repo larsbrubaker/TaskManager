@@ -1,0 +1,25 @@
+# taskmanager-wasm: the browser shell (wasm cdylib). agg-gui-web-shell owns the canvas, the
+# GPU surface, the frame loop and DOM input; this crate boots taskmanager-core's app (on the
+# simulated demo machine once it exists, M1). Natively it compiles to an empty rlib so
+# `cargo build --workspace` stays green on every platform.
+[package]
+name = "taskmanager-wasm"
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+authors.workspace = true
+license.workspace = true
+repository.workspace = true
+homepage.workspace = true
+readme.workspace = true
+keywords.workspace = true
+categories.workspace = true
+description = "WebAssembly (browser) shell for the TaskManager demo."
+
+[lib]
+crate-type = ["cdylib", "rlib"]
+
+[target.'cfg(target_arch = "wasm32")'.dependencies]
+taskmanager-core = { path = "../taskmanager-core" }
+agg-gui-web-shell = { workspace = true }
+wasm-bindgen = "0.2"

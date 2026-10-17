@@ -1,0 +1,17 @@
+# Cargo aliases for TaskManager.
+[alias]
+# `cargo dev` — rebuild and relaunch the native app on every save.
+#
+# Requires `cargo install cargo-watch` (one-time). The native binary is the fastest
+# iteration loop; the wasm build is separate so wasm-pack does not run on every edit.
+dev = [
+    "watch",
+    "-i",
+    "target",
+    "-i",
+    "demo/public/pkg",
+    "-i",
+    "taskmanager-wasm/pkg",
+    "-x",
+    "run -p taskmanager-native",
+]

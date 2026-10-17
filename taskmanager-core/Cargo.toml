@@ -1,0 +1,22 @@
+# taskmanager-core: the target-agnostic heart of TaskManager. Everything testable lives here
+# (readings, formatting, fonts and icons, widgets; telemetry, the platform contract and the
+# demo machine as they land). No platform code: the shells supply the OS.
+[package]
+name = "taskmanager-core"
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+authors.workspace = true
+license.workspace = true
+repository.workspace = true
+homepage.workspace = true
+readme.workspace = true
+keywords.workspace = true
+categories.workspace = true
+description = "Target-agnostic core of TaskManager, a task manager and system monitor."
+
+[dependencies]
+agg-gui = { workspace = true }
+
+[lib]
+crate-type = ["rlib"]

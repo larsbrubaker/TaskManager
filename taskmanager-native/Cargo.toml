@@ -1,0 +1,25 @@
+# taskmanager-native: the desktop shell. agg-gui-shell owns the window and event loop; this
+# crate names and sizes the window and hands it the root widget from taskmanager-core (the
+# real OS telemetry provider arrives in M1).
+[package]
+name = "taskmanager-native"
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+authors.workspace = true
+license.workspace = true
+repository.workspace = true
+homepage.workspace = true
+readme.workspace = true
+keywords.workspace = true
+categories.workspace = true
+description = "Native (winit + wgpu) shell for TaskManager."
+
+[[bin]]
+name = "taskmanager"
+path = "src/main.rs"
+
+[dependencies]
+taskmanager-core = { path = "../taskmanager-core" }
+agg-gui = { workspace = true }
+agg-gui-shell = { workspace = true }

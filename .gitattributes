@@ -1,0 +1,5 @@
+# Windows batch files need CRLF line endings: cmd.exe can mis-handle labels in LF files.
+*.cmd text eol=crlf
+# Shell launchers and scripts need LF line endings: bash rejects CRLF ("\r: command not found").
+*.sh text eol=lf
+*.command text eol=lf

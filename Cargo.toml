@@ -1,0 +1,66 @@
+# TaskManager workspace: a task manager and system monitor built on agg-gui (see CLAUDE.md,
+# docs/PLAN.md).
+#
+# - taskmanager-core   (rlib)   everything testable: readings, telemetry, formatting, widgets.
+# - taskmanager-native (bin)    the desktop shell (agg-gui-shell) plus the real platform.
+# - taskmanager-wasm   (cdylib) the browser shell (agg-gui-web-shell) running the demo platform.
+#
+# taskmanager-wasm is a member (so clippy/fmt cover it) but not a default member: it only does
+# something on wasm32, and `cargo run` should pick the native binary.
+[workspace]
+resolver = "2"
+members = ["taskmanager-core", "taskmanager-native", "taskmanager-wasm"]
+default-members = ["taskmanager-core", "taskmanager-native"]
+
+[workspace.package]
+version = "0.1.0"
+edition = "2021"
+# Same as the sibling HDTreeMap: sysinfo 0.39 (the native telemetry base, from M1) requires
+# 1.95 (wgpu 29, under agg-gui-shell / agg-gui-web-shell, needs 1.87).
+rust-version = "1.95"
+authors = ["Lars Brubaker <larsbrubaker@matterhackers.com>"]
+license = "MIT"
+repository = "https://github.com/larsbrubaker/TaskManager"
+homepage = "https://larsbrubaker.github.io/TaskManager/"
+readme = "README.md"
+keywords = ["task-manager", "system-monitor", "process", "gui", "agg-gui"]
+categories = ["os", "visualization", "gui"]
+
+[workspace.dependencies]
+agg-gui = "0.5.1"
+# Published native shell (winit event loop + wgpu present + input plumbing).
+agg-gui-shell = "0.5.2"
+# Turn-key browser shell. Not published to crates.io yet, so it is a path dependency on the
+# sibling agg-gui checkout (CI clones it there too).
+agg-gui-web-shell = { path = "../agg-gui/agg-gui-web-shell" }
+
+# ---------------------------------------------------------------------------
+# Local development override — see CLAUDE.md "Local development uses agg-gui
+# as a path dep". The rust-apps superproject lays out agg-gui as a sibling.
+# CI clones it the same way so these patches resolve both locally and in Actions.
+# ---------------------------------------------------------------------------
+[patch.crates-io]
+agg-gui = { path = "../agg-gui/agg-gui" }
+agg-gui-shell = { path = "../agg-gui/agg-gui-shell" }
+
+# ---------------------------------------------------------------------------
+# Debug-build optimization. BOTH sections are required (see the comment in
+# agg-gui/Cargo.toml). `[profile.dev.package."*"]` applies to dependencies
+# only; agg-gui's generic / #[inline] rendering code is monomorphized into the
+# *calling* crate and inherits that crate's opt-level, so workspace members
+# need `opt-level = 1` or the dependency override is defeated in the hottest
+# code path.
+# ---------------------------------------------------------------------------
+[profile.dev]
+opt-level = 1
+
+[profile.dev.package."*"]
+opt-level = 2
+
+[profile.release]
+opt-level = 3
+lto = "thin"
+codegen-units = 1
+
+[profile.release.package."*"]
+opt-level = 3

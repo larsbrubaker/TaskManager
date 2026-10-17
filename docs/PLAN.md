@@ -63,16 +63,16 @@ Reference: every `reference/app/*.png`.
 │            │                                                              │
 │  ~logo~    │                                                              │
 ├────────────┼──────────────────────────────────────────────────────────────┤
-│⚙ Settings │🎨 Colors ˄│ ● Providers healthy · 542 processes │ IP … │ Gen 81 │ ● ■ ● │
+│⚙ Settings │ ☀/☾ theme │ ● Providers healthy · 542 processes │ IP … │ Gen 81 │ ● ■ ● │
 └────────────┴──────────────────────────────────────────────────────────────┘
 ```
 
-- **Sidebar** (~190 pt wide, light grey `#E6E6E6`-ish in Light, near-black in Dark): one
-  row per destination, Font Awesome icon + label (~17 pt), rounded selection pill in a
-  pale accent blue. TMOG splits the list with a small "PRO" divider; ours keeps the
+- **Sidebar** (~190 pt wide, agg-gui's panel colour for the current theme): one
+  row per destination, Font Awesome icon + label (~17 pt), rounded selection pill in the theme's selection colour. TMOG splits the list with a small "PRO" divider; ours keeps the
   divider as a plain group separator labelled **MORE** (we have no Pro).
   The logo sits near the bottom; below it, a footer row with **Settings** and
-  **Colors ˄** (opens the Colors popover above it, §5.16).
+  a **theme** button (sun/moon) that switches agg-gui Light / Dark. TMOG's Colors
+  popover is not reproduced.
 - **Title bar row**: sidebar toggle icon, then the page title, large, in agg-gui's default font. Page actions on the right: a filter field ("Filter by name, user, or PID"),
   a view combo ("Process View"), Reload, Export…, Reset, Start, depending on page.
 - **Notice banner**: pale blue strip with an info icon, message, and optional
@@ -106,8 +106,8 @@ headless test and a screenshot example.
 
 Every instrument reads its colours from the theme's **ChannelPalette** (Light/Dark
 values per channel: cpu, kernel, memory, gpu, npu, disk, network, energy, thermals) and
-honours the Colors settings: Saturation (0–11), Visual Bloom (0–11), Display
-(Color/Mono) and VFD Text (Automatic/On/Off).
+follows the agg-gui theme (Light or Dark). No saturation, bloom, mono or VFD
+settings: the glow and VFD look are fixed.
 
 Fonts: agg-gui's default face (Noto Sans) everywhere, titles set large; no bundled title font;
 Font Awesome 4.7 icons by code point (`fonts::fa`); VfdText draws its own glyphs.
@@ -124,8 +124,8 @@ pub enum Reading<T> {
 }
 ```
 
-UI rules: `Value(0)` shows `0` (TMOG shows "Zero KB/s"; we show `Zero KB/s` too, it
-reads well); `Unavailable` shows "Unavailable"; `Unsupported` shows "—" or hides the
+UI rules: `Value(0)` shows a real zero (`0 B/sec`, `0.0%`), as the
+app captures do; `Unavailable` shows "Unavailable"; `Unsupported` shows "—" or hides the
 row; graphs break the line across non-`Value` samples.
 
 ### 4.2 Samples and history
@@ -331,7 +331,7 @@ SegmentBar, **Start**, status ("Ready"), **History** with Clear History…; **Re
 the title row. Our own benchmark kernels (integer/float mix, memory bandwidth, disk
 sequential/random, an HTTP download test against a URL the user configures).
 
-### 5.16 Settings and Colors — `app/16-settings-*.png`
+### 5.16 Settings — `app/16-settings-*.png`
 Settings is a page (optionally a floating window) of grouped cards: **Appearance**
 (Language, Temperature unit, Display font, Live dock/taskbar icon, menu bar/tray item
 and its contents, High-frequency visuals 30/60/120 fps, Show Settings as a dialog);
@@ -340,9 +340,9 @@ Compress older history, History multiplier, Pixels per update); **Processes**
 (include TaskManager itself, per-core CPU statistics); **Updates**; **Global shortcut**
 (Open with Control-Shift-Escape); **Window management** (Always on top, Hide on close).
 TMOG's popout, skins, screensaver and remote-connection settings are out of scope.
-The **Colors** popover (from the sidebar footer): App theme (Match System / Light /
-Dark), Display (Color / Mono), VFD Text (Automatic / On / Off), Saturation 0–11, Visual
-Bloom 0–11, HDR toggle (brighter glow on EDR displays where available).
+Theme is one setting, App theme (Match System / Light / Dark), mapped straight onto
+agg-gui's Light and Dark visuals; TMOG's Colors popover (display mode, VFD text,
+saturation, bloom, HDR) is out of scope.
 
 ## 6. Crate layout (mirrors HDTreeMap)
 
@@ -350,7 +350,8 @@ Bloom 0–11, HDR toggle (brighter glow on EDR displays where available).
 taskmanager-core/     rlib, everything testable, no platform code
   src/fonts.rs          font sizes + Font Awesome code points (fa::*)
   src/theme.rs          Theme {Light, Dark, System}, agg-gui Visuals, ChannelPalette
-  src/format.rs         bytes, rates, %, °C/°F, durations, "Zero KB/s"
+  src/format.rs         bytes, rates, %, °C/°F, durations; sizes one decimal ("2.2 GB"),
+                        rates three significant figures with "/sec" ("35.8 KB/sec")
   src/reading.rs        Reading<T>
   src/telemetry/        Snapshot, Sampler, History (ring + compression), Generation
   src/process/          ProcessKey, process table, grouping (apps/background), tree
@@ -414,7 +415,7 @@ commit.
 | M9 | Apps & disk | Installed Apps, Disk Space (§5.12, 5.14). |
 | M10 | Benchmarks | Gauge widget + CPU/GPU/Disk/Internet kernels + score (§5.15). |
 | M11 | Recorder | .tmtrace record/replay driving all pages (§5.10). |
-| M12 | Settings & polish | Settings page + Colors popover (§5.16), global shortcut, tray/menu bar item, persistence, About. |
+| M12 | Settings & polish | Settings page (§5.16), global shortcut, tray/menu bar item, persistence, About. |
 | M13 | Web demo & release | wasm demo on GitHub Pages; release workflow (macOS universal .app, Windows zip, Linux tar.gz/AppImage); README with hero. |
 
 ## 10. Open questions

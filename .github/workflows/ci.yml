@@ -1,0 +1,75 @@
+# CI for TaskManager: fmt, clippy (-D warnings) and tests on Linux, macOS and Windows, plus a
+# wasm32 check of the browser shell. Mirrors scripts/pre-commit-check.{sh,ps1}.
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+jobs:
+  rust:
+    name: rust (${{ matrix.os }})
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, macos-latest, windows-latest]
+    runs-on: ${{ matrix.os }}
+    steps:
+      - uses: actions/checkout@v4
+
+      # Sibling agg-gui checkout — Cargo.toml has a [patch.crates-io] entry pointing at
+      # `../agg-gui/agg-gui` (and the wasm shell is a path dependency there), so we develop
+      # against the latest agg-gui sources. See CLAUDE.md.
+      # agg-gui's crates in turn use path dependencies on ../../agg-rust and ../../tess2-rust,
+      # so those are cloned beside the repo too.
+      - name: Clone agg-gui, agg-rust and tess2-rust siblings
+        shell: bash
+        run: |
+          git clone --depth 1 https://github.com/larsbrubaker/agg-gui.git ../agg-gui
+          git clone --depth 1 https://github.com/larsbrubaker/agg-rust.git ../agg-rust
+          git clone --depth 1 https://github.com/larsbrubaker/tess2-rust.git ../tess2-rust
+
+      - name: Install Rust toolchain
+        uses: dtolnay/rust-toolchain@stable
+        with:
+          components: rustfmt, clippy
+
+      - name: Cache cargo
+        uses: Swatinem/rust-cache@v2
+
+      - name: cargo fmt --check
+        # Scoped to TaskManager packages: `cargo fmt --all` would also check the sibling.
+        run: cargo fmt --package taskmanager-core --package taskmanager-native --package taskmanager-wasm -- --check
+
+      - name: cargo clippy
+        run: cargo clippy --workspace --all-targets -- -D warnings
+
+      - name: cargo test
+        run: cargo test --workspace
+
+  wasm:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Clone agg-gui, agg-rust and tess2-rust siblings
+        run: |
+          git clone --depth 1 https://github.com/larsbrubaker/agg-gui.git ../agg-gui
+          git clone --depth 1 https://github.com/larsbrubaker/agg-rust.git ../agg-rust
+          git clone --depth 1 https://github.com/larsbrubaker/tess2-rust.git ../tess2-rust
+
+      - name: Install Rust toolchain
+        uses: dtolnay/rust-toolchain@stable
+        with:
+          components: clippy
+          targets: wasm32-unknown-unknown
+
+      - name: Cache cargo
+        uses: Swatinem/rust-cache@v2
+
+      - name: cargo check (wasm32)
+        run: cargo check -p taskmanager-wasm --target wasm32-unknown-unknown
+
+      - name: cargo clippy (wasm32)
+        run: cargo clippy -p taskmanager-wasm --target wasm32-unknown-unknown -- -D warnings
