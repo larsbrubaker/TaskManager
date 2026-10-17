@@ -251,7 +251,9 @@ impl Load {
         self.cpu_power_w = ((0.4 + 19.0 * l.powf(1.15)) * wobble) as f32;
         self.gpu_power_w = (0.05 + 8.0 * g) as f32;
         self.ane_power_w = 0.025 * self.npu_pct;
-        self.system_power_w = 4.2 + self.cpu_power_w + self.gpu_power_w + self.ane_power_w;
+        // The rest of the machine (display, memory, SSD, fabric) draws 4.6 W, so the system
+        // total never falls below 5 W: the CPU alone draws at least 0.38 W.
+        self.system_power_w = 4.6 + self.cpu_power_w + self.gpu_power_w + self.ane_power_w;
 
         let sup = f64::from(self.super_active_pct) / 100.0;
         let eff = f64::from(self.efficiency_active_pct) / 100.0;
@@ -342,6 +344,19 @@ mod tests {
         let before = Load::at(seed, t - 3.0).die_c[0];
         let after = Load::at(seed, t + 6.0).die_c[0];
         assert!(after > before, "{before} -> {after}");
+    }
+
+    #[test]
+    fn power_and_temperature_stay_in_range_for_any_seed() {
+        for seed in 0..40u64 {
+            for i in 0..400 {
+                let load = Load::at(seed, f64::from(i) * 9.7);
+                let w = load.system_power_w;
+                assert!((5.0..=30.0).contains(&w), "seed {seed}: {w} W");
+                let temp = load.die_c.iter().sum::<f32>() / 4.0;
+                assert!((45.0..=70.0).contains(&temp), "seed {seed}: {temp} C");
+            }
+        }
     }
 
     #[test]

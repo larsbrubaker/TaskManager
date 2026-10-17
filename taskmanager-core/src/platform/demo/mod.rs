@@ -1,4 +1,4 @@
-//! `DemoPlatform`: a deterministic simulated machine for the web build, `--demo`, tests
+//! The demo platform: a deterministic simulated machine for the web build, `--demo`, tests
 //! and screenshots (PLAN §4.3). Runs on every target, wasm32 included: no threads, no
 //! system clock, no OS entropy.
 //!

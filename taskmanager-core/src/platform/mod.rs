@@ -7,9 +7,10 @@
 //! - a [`PlatformServices`], for actions (end a process, open a URL) and, in later
 //!   milestones, inventories.
 //!
-//! `DemoPlatform` (core, `platform/demo/`) implements both for a simulated machine on
-//! every target; `NativePlatform` (taskmanager-native) implements them per OS. Widgets
-//! ask [`PlatformServices::is_demo`] instead of using `cfg`.
+//! The demo platform (core, `platform/demo/`: `demo_platform(seed) -> (DemoProvider,
+//! DemoServices)`) implements both for a simulated machine on every target;
+//! `NativePlatform` (taskmanager-native) implements them per OS. Widgets ask
+//! [`PlatformServices::is_demo`] instead of using `cfg`.
 //!
 //! ## Provider and services sharing state
 //!

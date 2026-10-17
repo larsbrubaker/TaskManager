@@ -50,17 +50,22 @@ fn reading<T>(known: bool, value: T) -> Reading<T> {
     }
 }
 
-/// The process that soaks up the current CPU burst: a hungry, unrestricted process,
-/// chosen per burst.
+/// The process that soaks up the current CPU burst. It must stay the same for the whole
+/// burst while other processes come and go, so it is chosen by a stable property: among
+/// the hungry, unrestricted, long-lived processes (no scheduled exit, never restarted),
+/// the one whose key hashes lowest for this burst. Only ending that very process moves
+/// the burst elsewhere.
 fn burst_target(seed: u64, procs: &[SimProcess], slot: i64) -> Option<usize> {
-    let hungry: Vec<usize> = (0..procs.len())
-        .filter(|&i| procs[i].weight >= 0.3 && !procs[i].restricted)
-        .collect();
-    if hungry.is_empty() {
-        return None;
-    }
-    let pick = hash(seed, 0xB0, slot) % hungry.len() as u64;
-    hungry.get(pick as usize).copied()
+    let rank = |p: &SimProcess| {
+        let key = (u64::from(p.key.pid.0) << 40) ^ p.key.start_time;
+        hash(seed ^ key, 0xB0, slot)
+    };
+    (0..procs.len())
+        .filter(|&i| {
+            let p = &procs[i];
+            p.weight >= 0.3 && !p.restricted && !p.restarts && p.exit_at.is_none()
+        })
+        .min_by_key(|&i| rank(&procs[i]))
 }
 
 fn activities(seed: u64, procs: &[SimProcess], load: &Load, t: f64) -> Vec<Activity> {
@@ -212,6 +217,7 @@ pub fn sample_rows(
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::process::ProcessKey;
 
     #[test]
     fn cpu_shares_add_up_to_the_attributed_total() {
@@ -226,6 +232,27 @@ mod tests {
         assert!((sum - expected).abs() < 0.01, "{sum} vs {expected}");
         let visible: f32 = rows.iter().filter_map(|r| r.cpu_pct.value()).sum();
         assert!(f64::from(visible) <= expected + 0.01);
+    }
+
+    #[test]
+    fn burst_target_ignores_churn_around_it() {
+        let pop = Population::new(4, 90_000.0);
+        let procs = pop.procs().to_vec();
+        for slot in 0..20 {
+            let target = burst_target(4, &procs, slot).map(|i| procs[i].key);
+            assert!(target.is_some());
+            // A hungry tool starts in front of everyone, and a renderer restarts.
+            let mut churned = procs.clone();
+            let mut tool = churned[0].clone();
+            tool.key = ProcessKey::new(99_999, 1);
+            tool.weight = 5.0;
+            tool.restricted = false;
+            tool.exit_at = Some(3.0);
+            churned.insert(0, tool);
+            churned.retain(|p| !p.restarts);
+            let again = burst_target(4, &churned, slot).map(|i| churned[i].key);
+            assert_eq!(target, again, "slot {slot}");
+        }
     }
 
     #[test]

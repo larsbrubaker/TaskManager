@@ -256,7 +256,7 @@ impl Population {
         self.procs[i].exit_at = Some(at);
         let mut fresh = self.procs[i].clone();
         fresh.exit_at = None;
-        fresh.start_s = self.boot_uptime_s + at + 0.3;
+        fresh.start_s = self.boot_uptime_s + at;
         fresh.channel = hash(self.seed, 0x9C0, (fresh.start_s * 1e6) as i64);
         fresh.cpu_time_s = 0.0;
         fresh.page_faults = 0.0;

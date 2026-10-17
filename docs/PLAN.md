@@ -169,9 +169,13 @@ every field a `Reading` and rates computed by the provider, `health()`), and
 - `is_demo()` so widgets never `cfg` on the target.
 
 Implementations:
-- `DemoPlatform` (core, all targets): a deterministic simulated machine with plausible
-  load curves, process churn (processes start and exit), a few hundred processes, and
-  every inventory filled. Seeded, so tests and screenshots are reproducible.
+- Demo platform (core, all targets, `platform/demo/`): `demo_platform(seed) ->
+  (DemoProvider, DemoServices)` over one shared `Arc<Mutex<DemoMachine>>`; a
+  deterministic simulated machine with plausible load curves, process churn (processes
+  start and exit), ~540 processes, and every inventory filled. Seeded, and its clock is
+  the time since the first sample, so tests and screenshots are reproducible. Ending a
+  root-owned demo process returns `PermissionDenied` (the demo user may not signal it);
+  ending any other process also removes its descendants (an app's helpers quit with it).
 - `NativePlatform` (taskmanager-native): `sysinfo` for the cross-platform base (CPU,
   memory, processes, disks, networks, users, components/temperatures), plus per-OS
   modules for what sysinfo lacks:
@@ -380,7 +384,7 @@ taskmanager-core/     rlib, everything testable, no platform code
                         (SampleProducer), state (TelemetryState), sampler (both)
   src/process/          key (ProcessKey), table (rows, grouping, exited retention), tree
   src/platform.rs       TelemetryProvider + PlatformServices traits
-  src/platform/demo/    DemoPlatform: simulated machine (all targets)
+  src/platform/demo/    demo platform: simulated machine, demo_platform(seed) (all targets)
   src/platform/parse/   pure parsers (proc, meminfo, launchctl, netstat tables, …)
   src/recorder/         .tmtrace writer/reader, replay clock
   src/settings.rs       persisted settings (JSON) + SettingsStore trait
